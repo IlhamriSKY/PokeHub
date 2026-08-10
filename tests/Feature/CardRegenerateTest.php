@@ -135,6 +135,10 @@ class CardRegenerateTest extends TestCase
      * Travels a minute between presses to step past the per-minute burst limit that sits beside
      * the quota - if those two ever share a cache key again, the daily counter resets with the
      * burst window and this test goes green forever while the bill climbs.
+     *
+     * `limit + 1` presses succeed, not `limit`: the first generation on an account is free and
+     * leaves the daily counter untouched (RegenQuota::spend). The block still lands on the press
+     * after the pot is empty, which is the part that costs money.
      */
     public function test_a_user_cannot_regenerate_more_than_the_daily_limit()
     {
@@ -143,7 +147,7 @@ class CardRegenerateTest extends TestCase
 
         $user = User::factory()->create(['github_login' => 'dev']);
 
-        for ($i = 1; $i <= 3; $i++) {
+        for ($i = 1; $i <= 4; $i++) {
             $this->actingAs($user)
                 ->post('/dashboard/card/regenerate', [])
                 ->assertSessionHasNoErrors();
@@ -171,6 +175,11 @@ class CardRegenerateTest extends TestCase
         config(['pokehub.daily_regen_limit' => 1]);
 
         $user = User::factory()->create(['github_login' => 'dev', 'github_id' => '4242']);
+        // Twice: the first is the free welcome, the second empties the one-generation pot. Both
+        // are keyed on github_id, so BOTH have to survive the round trip - a welcome that refills
+        // is the same bypass one card at a time.
+        $this->actingAs($user)->post('/dashboard/card/regenerate', [])->assertSessionHasNoErrors();
+        $this->travel(61)->seconds();
         $this->actingAs($user)->post('/dashboard/card/regenerate', [])->assertSessionHasNoErrors();
 
         // What DELETE /settings/profile then a fresh GitHub callback leaves behind.
@@ -194,6 +203,8 @@ class CardRegenerateTest extends TestCase
         $admin = User::factory()->create(['github_login' => 'dev']);
         $admin->assignRole('admin');
 
+        // Three presses: the welcome, then two that count. Past the cap of 1 and still not blocked.
+        $this->actingAs($admin)->post('/dashboard/card/regenerate', [])->assertSessionHasNoErrors();
         $this->actingAs($admin)->post('/dashboard/card/regenerate', [])->assertSessionHasNoErrors();
         $this->actingAs($admin)->post('/dashboard/card/regenerate', [])->assertSessionHasNoErrors();
 
@@ -210,6 +221,12 @@ class CardRegenerateTest extends TestCase
         config(['pokehub.daily_regen_limit' => 5]);
 
         $user = User::factory()->create(['github_login' => 'dev']);
+        // The free welcome first - it must NOT move the meter - then one that does.
+        $this->actingAs($user)->post('/dashboard/card/regenerate', [])->assertSessionHasNoErrors();
+        $this->actingAs($user)->get('/dashboard')->assertInertia(fn ($page) => $page
+            ->where('quota.used', 0)
+            ->where('quota.welcome', false));
+
         $this->actingAs($user)->post('/dashboard/card/regenerate', [])->assertSessionHasNoErrors();
 
         $this->actingAs($user)->get('/dashboard')->assertInertia(fn ($page) => $page
@@ -218,6 +235,32 @@ class CardRegenerateTest extends TestCase
             ->where('quota.unlimited', false)
             // Rolling 24h from that first press, which is what the countdown ticks down.
             ->where('quota.resets_in', fn ($s) => $s > 86_000 && $s <= 86_400));
+    }
+
+    /**
+     * The first generation on an account is on the house, so a new user does not spend a fifth of
+     * their day's quota just to see their own card once.
+     *
+     * Keyed on github_id like the daily counter, and for the same reason - see the delete/re-auth
+     * test above. Asserting `welcome` here as well as `used` is deliberate: `used` staying at 0
+     * would also be true if the press had failed outright.
+     */
+    public function test_the_first_generation_is_free()
+    {
+        $this->fakeGithub();
+        config(['pokehub.daily_regen_limit' => 5]);
+
+        $user = User::factory()->create(['github_login' => 'dev']);
+
+        $this->actingAs($user)->get('/dashboard')->assertInertia(fn ($page) => $page
+            ->where('quota.used', 0)
+            ->where('quota.welcome', true));
+
+        $this->actingAs($user)->post('/dashboard/card/regenerate', [])->assertSessionHasNoErrors();
+
+        $this->actingAs($user)->get('/dashboard')->assertInertia(fn ($page) => $page
+            ->where('quota.used', 0)
+            ->where('quota.welcome', false));
     }
 
     /** A press that never reaches the AI - a bad axis, a captcha typo - must not cost a generation. */
@@ -243,9 +286,12 @@ class CardRegenerateTest extends TestCase
         $spender = User::factory()->create(['github_login' => 'dev']);
         $bystander = User::factory()->create(['github_login' => 'dev']);
 
+        // Welcome, then the single counted generation, then the block.
+        $this->actingAs($spender)->post('/dashboard/card/regenerate', [])->assertSessionHasNoErrors();
         $this->actingAs($spender)->post('/dashboard/card/regenerate', [])->assertSessionHasNoErrors();
         $this->actingAs($spender)->post('/dashboard/card/regenerate', [])->assertSessionHasErrors('card');
 
+        // The bystander still has their own untouched welcome.
         $this->actingAs($bystander)->post('/dashboard/card/regenerate', [])->assertSessionHasNoErrors();
     }
 }

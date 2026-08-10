@@ -28,15 +28,25 @@ type Paginated = {
     total: number;
 };
 
-/** One landing-page showcase card, resolved the way every other surface resolves one. */
-function ShowcaseTile({ entry }: { entry: ShowcaseEntry }) {
-    const { options } = useCardOptions();
-    const rarity = rarityOf(raritiesFromOptions(options), entry.rarity);
-
-    return <PokeCard profile={entry.profile} rarity={rarity} {...resolveOverrides(options, entry.axes, rarity)} />;
-}
-
 export default function Cards({ cards, q, rarity, showcase = [] }: { cards: Paginated; q: string; rarity: string; showcase?: ShowcaseEntry[] }) {
+    /*
+     * The showcase four, wearing the same shape as everyone else so the grid, the zoom and the
+     * name link all treat them as ordinary cards. `login` is both the slug and the handle for
+     * them - their public page is /<login>, the same address the landing page links to.
+     *
+     * Ahead of the user rows rather than mixed in: the server only sends them on page one, and
+     * the user list has its own ordering that interleaving would quietly break.
+     */
+    const rows: CardRow[] = [
+        ...showcase.map((s) => ({
+            name: s.name,
+            slug: s.login,
+            github_login: s.login,
+            card: { profile: s.profile, rarity: s.rarity, axes: s.axes },
+        })),
+        ...cards.data,
+    ];
+
     const [term, setTerm] = useState(q);
     const [tier, setTier] = useState(rarity || ALL);
     const [zoom, setZoom] = useState<CardRow | null>(null);
@@ -81,32 +91,6 @@ export default function Cards({ cards, q, rarity, showcase = [] }: { cards: Pagi
             <Head title="Public cards" />
 
             <div className="flex w-full flex-col gap-5 p-4 sm:p-6">
-                {/* The same four the landing page opens with. They are the only cards on a young
-                    site with recognisable names, so they give the gallery something to be before
-                    it has enough real members to fill a page. Hidden as soon as a filter is on. */}
-                {showcase.length > 0 && (
-                    <section>
-                        <h2 className="text-sm font-semibold">Four developers you already know</h2>
-                        <p className="text-muted-foreground mt-0.5 text-xs">Real profiles, real numbers, made the same way yours was.</p>
-                        <ul className="mt-3 grid grid-cols-2 gap-x-3 gap-y-4 sm:grid-cols-4">
-                            {showcase.map((s) => (
-                                <li key={s.login} className="flex flex-col items-center gap-1.5">
-                                    <Link
-                                        href={`/${s.login}`}
-                                        className="focus-visible:ring-ring w-full rounded-lg transition-transform duration-200 hover:-translate-y-1 focus-visible:ring-2 focus-visible:outline-none"
-                                        aria-label={`${s.name} card`}
-                                    >
-                                        <ShowcaseTile entry={s} />
-                                    </Link>
-                                    <span className="w-full truncate text-center text-xs font-medium">{s.name}</span>
-                                    <span className="text-muted-foreground w-full truncate text-center text-[11px]">@{s.login}</span>
-                                </li>
-                            ))}
-                        </ul>
-                        <div aria-hidden="true" className="bg-border mt-6 h-px w-full" />
-                    </section>
-                )}
-
                 <div className="flex flex-wrap items-center gap-3">
                     <div className="relative min-w-[12rem] flex-1">
                         <Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
@@ -134,11 +118,11 @@ export default function Cards({ cards, q, rarity, showcase = [] }: { cards: Pagi
                     </Select>
 
                     <span className="text-muted-foreground shrink-0 text-xs tabular-nums">
-                        {cards.total} card{cards.total === 1 ? '' : 's'}
+                        {cards.total + showcase.length} card{cards.total + showcase.length === 1 ? '' : 's'}
                     </span>
                 </div>
 
-                {cards.data.length === 0 ? (
+                {rows.length === 0 ? (
                     <p className="text-muted-foreground py-16 text-center text-sm">
                         {q || rarity ? 'No public cards match those filters.' : 'No public cards yet.'}
                     </p>
@@ -146,7 +130,7 @@ export default function Cards({ cards, q, rarity, showcase = [] }: { cards: Pagi
                     /* auto-fill + a 200px cap: fixed column counts on a full-width page
                        stretch each card to ~400px wide, which is ~560px tall at 63:88. */
                     <ul className="grid grid-cols-[repeat(auto-fill,minmax(140px,1fr))] gap-x-4 gap-y-6">
-                        {cards.data.map((row) => (
+                        {rows.map((row) => (
                             <li key={row.slug} className="mx-auto flex w-full max-w-[200px] flex-col items-center gap-2">
                                 <button
                                     type="button"

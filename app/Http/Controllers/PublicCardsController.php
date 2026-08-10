@@ -41,11 +41,46 @@ class PublicCardsController extends Controller
             'cards' => $cards,
             'q' => $q,
             'rarity' => $rarity,
-            // The landing page's four, through the same cached query. Only on the unfiltered first
-            // view: once someone is searching, a fixed row of cards that ignore their query is not
-            // a feature, it is four results that will not go away.
-            'showcase' => $q === '' && $rarity === '' ? app(LandingController::class)->props()['showcase'] : [],
+            // The landing page's four, folded into the same grid as everyone else rather than
+            // pinned above it as a feature strip. They are cards in the gallery, so they answer to
+            // the search box and the rarity filter like every other card - a fixed row that ignored
+            // the query would just be four results that refuse to go away.
+            'showcase' => $this->showcase($q, $rarity),
             'seo' => Seo::private('Card gallery | PokeHub'),
         ]);
+    }
+
+    /**
+     * The landing showcase, filtered by the same terms as the card query.
+     *
+     * Matched in PHP rather than SQL because these live in `showcase_cards` and their renderable
+     * payload is assembled from a cached `profiles` row - there is no single query that returns
+     * them and the users together. Four rows, so the cost of filtering them here is nothing.
+     *
+     * They are appended to the FIRST page only. The user list is paginated, and repeating four
+     * fixed cards at the top of every page would push real results off the screen.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    private function showcase(string $q, string $rarity): array
+    {
+        if (request()->integer('page', 1) > 1) {
+            return [];
+        }
+
+        $needle = mb_strtolower($q);
+
+        return collect(app(LandingController::class)->props()['showcase'])
+            ->filter(function (array $c) use ($needle, $rarity) {
+                if ($rarity !== '' && ($c['rarity'] ?? '') !== $rarity) {
+                    return false;
+                }
+
+                return $needle === ''
+                    || str_contains(mb_strtolower((string) $c['name']), $needle)
+                    || str_contains(mb_strtolower((string) $c['login']), $needle);
+            })
+            ->values()
+            ->all();
     }
 }
