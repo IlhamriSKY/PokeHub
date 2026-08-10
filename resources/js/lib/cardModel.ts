@@ -56,6 +56,26 @@ export function elementsForGen<T extends { slug: string }>(elements: T[], genera
 export const elementSupported = (generation: string, slug: string): boolean =>
     slug === 'auto' || slug === 'none' || elementHasFrame(generation as AssetGen, slug);
 
+// Upstream's DUAL TYPE list drops Dark. 1-gen ships no dark frame at all, so this only bites here.
+const DUAL_DROPS_DARK = new Set(['tcg-gen', 'scarlet-violet']);
+
+/**
+ * Can `slug` be this generation's SECOND type?
+ *
+ * Not the same question as `elementSupported`, which asks for a frame. A dual type only ever draws
+ * an energy disc beside the primary one, so upstream offers Fairy as a dual on Scarlet & Violet
+ * even though SV ships no Fairy frame. Measured on all three generations: 1-gen dual == its own 7
+ * types, tcg-gen 11 types -> 10 duals, SV 10 types -> 10 duals (minus Dark, plus Fairy). Deriving
+ * the list from the frame-gated one alone lost Fairy on SV, the single entry that differs.
+ *
+ * Lives here rather than in the settings panel because the All-variants gallery needs the same
+ * answer, and a second copy of this rule would be a second thing to forget.
+ */
+export const dualSupported = (generation: string, slug: string): boolean =>
+    DUAL_DROPS_DARK.has(generation)
+        ? slug !== 'darkness' && (slug === 'fairy' || elementSupported(generation, slug))
+        : elementSupported(generation, slug);
+
 /**
  * Does this generation offer the "chrome" axes - Name icon, Tag stamp, Set badge?
  *

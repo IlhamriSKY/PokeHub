@@ -16,7 +16,7 @@ const breadcrumbs: BreadcrumbItem[] = [{ title: 'My card', href: '/dashboard' }]
 
 type CardData = { profile: Profile; rarity: string; axes: Partial<Axes> };
 /** `used` keeps counting past `limit` for an admin - see RegenQuota::unlimited(). */
-type Quota = { limit: number; used: number; resets_in: number; unlimited: boolean };
+type Quota = { limit: number; used: number; resets_in: number; unlimited: boolean; welcome: boolean };
 type PageProps = SharedData & {
     profile: {
         slug: string | null;
@@ -305,6 +305,9 @@ function QuotaMeter({ quota }: { quota: Quota }) {
 
             <p className="text-muted-foreground mt-2 text-[11px]">
                 {quota.unlimited && 'Not blocked at the cap. '}
+                {/* Worth saying out loud: otherwise the first generation looks like a bug when the
+                    meter stays on 0 / 5 afterwards. */}
+                {quota.welcome && 'Your first card is free and does not count. '}
                 {left > 0 ? (
                     <>
                         Resets in <span className="tabular-nums">{hhmmss(left)}</span>

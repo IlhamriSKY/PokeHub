@@ -15,7 +15,7 @@ use Throwable;
  */
 class CardImageController extends Controller
 {
-    private const MIME = ['gif' => 'image/gif', 'svg' => 'image/svg+xml'];
+    private const MIME = ['gif' => 'image/gif', 'svg' => 'image/svg+xml', 'png' => 'image/png'];
 
     public function show(string $slug, string $format, PublicCardLookup $lookup, CardCapture $capture)
     {

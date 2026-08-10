@@ -153,6 +153,9 @@ export default function AdminLab({ targets, editing }: { targets: Target[]; edit
                                     topLang={editing.card.profile.top_lang}
                                     onChange={setAxes}
                                     onRarityChange={setRarity}
+                                    // The lab is the map of what the product can draw, so it lists
+                                    // every option including the ones this generation cannot use.
+                                    showAll
                                 />
                             ) : (
                                 text && <CardText text={text} onChange={setText} showWhy={editing.key.startsWith('showcase:')} />

@@ -1,4 +1,4 @@
-import { avatarUrl, cardHp, fmt, resistanceAmount, weaknessAmount, type Element, type Lore, type Profile } from '@/lib/rarities';
+import { avatarUrl, cardHp, fmt, hasResistance, resistanceAmount, weaknessAmount, type Element, type Lore, type Profile } from '@/lib/rarities';
 
 /** Generations that render from real pokecardgenerator WebP frame assets. */
 export type AssetGen = '1-gen' | 'tcg-gen' | 'scarlet-violet';
@@ -408,15 +408,19 @@ export function PcgFace({
                     <Emblem t={match.weak} />
                     <span className="pcg-wk-amt">{weaknessAmount(gen)}</span>
                 </span>
+                {/* Stays in the DOM even when empty: it is the middle GRID CELL, and the frame bakes
+                    a divider on each side of it. Dropping the element would slide the retreat cost
+                    left into the resistance slot. */}
                 <span>
-                    {match.resist ? (
-                        <>
-                            <Emblem t={match.resist} />
-                            {resistanceAmount()}
-                        </>
-                    ) : (
-                        '—'
-                    )}
+                    {hasResistance(gen) &&
+                        (match.resist ? (
+                            <>
+                                <Emblem t={match.resist} />
+                                {resistanceAmount()}
+                            </>
+                        ) : (
+                            '—'
+                        ))}
                 </span>
                 <span>
                     <span className="pcg-wrr-lbl">retreat</span>

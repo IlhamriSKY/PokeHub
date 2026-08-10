@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\User;
+use App\Support\Seo;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
@@ -36,6 +37,15 @@ class PublicCardsController extends Controller
                 'card' => $u->card,
             ]);
 
-        return Inertia::render('cards', ['cards' => $cards, 'q' => $q, 'rarity' => $rarity]);
+        return Inertia::render('cards', [
+            'cards' => $cards,
+            'q' => $q,
+            'rarity' => $rarity,
+            // The landing page's four, through the same cached query. Only on the unfiltered first
+            // view: once someone is searching, a fixed row of cards that ignore their query is not
+            // a feature, it is four results that will not go away.
+            'showcase' => $q === '' && $rarity === '' ? app(LandingController::class)->props()['showcase'] : [],
+            'seo' => Seo::private('Card gallery | PokeHub'),
+        ]);
     }
 }

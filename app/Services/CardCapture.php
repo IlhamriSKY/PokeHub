@@ -42,8 +42,14 @@ class CardCapture
     /** Output width. The capture runs at 2x this and box-averages down, which is the AA pass. */
     private const WIDTH = 320;
 
-    /** @var string[] */
-    public const FORMATS = ['gif', 'svg'];
+    /**
+     * `png` is the same still `svg` wraps, written raw. It exists for link previews: Open Graph
+     * scrapers reject SVG outright and several render only the first frame of a GIF, so a share
+     * card needs a plain raster. Warming it costs the same one shot the SVG already pays for.
+     *
+     * @var string[]
+     */
+    public const FORMATS = ['gif', 'svg', 'png'];
 
     /** Hex digits of the hash in a filename. forget() matches on exactly this many. */
     private const STAMP_LEN = 12;

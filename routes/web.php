@@ -8,6 +8,7 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\LandingController;
 use App\Http\Controllers\PublicCardController;
 use App\Http\Controllers\PublicCardsController;
+use App\Http\Controllers\SeoFilesController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
@@ -21,6 +22,13 @@ Route::get('api/github.php', [GithubController::class, 'show'])->middleware('thr
 Route::get('api/options.php', [OptionsController::class, 'index'])->middleware('throttle:60,1');
 
 Route::get('/', [LandingController::class, 'index'])->name('home');
+
+// Machine-readable, and deliberately ABOVE the catch-all slug routes at the bottom of this file:
+// `{slug}` matches "sitemap" and "robots" happily, so registering these later would have handed
+// them to the card lookup and 404'd them.
+Route::get('sitemap.xml', [SeoFilesController::class, 'sitemap'])->name('sitemap');
+Route::get('robots.txt', [SeoFilesController::class, 'robots'])->name('robots');
+Route::get('llms.txt', [SeoFilesController::class, 'llms'])->name('llms');
 
 Route::middleware(['auth'])->group(function () {
     Route::get('dashboard', [DashboardController::class, 'index'])->name('dashboard');
@@ -82,7 +90,7 @@ require __DIR__.'/auth.php';
 Route::get('{slug}.{format}', [CardImageController::class, 'show'])
     ->middleware('throttle:6,1')
     ->where('slug', '[A-Za-z0-9][A-Za-z0-9-]*')
-    ->where('format', 'gif|svg')
+    ->where('format', 'gif|svg|png')
     ->name('public.card.image');
 
 Route::get('{slug}', [PublicCardController::class, 'show'])

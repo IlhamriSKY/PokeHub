@@ -947,14 +947,41 @@
 .gen-scarlet-violet .pcg-cost .pcg-emblem {
     height: 4.2cqw;
 }
+/* Fills the 3.46% band: cqw is a share of card WIDTH, and the card is 1.333 taller than it is wide,
+   so 4.6cqw = 3.45% of height. Was 4.2cqw = 3.15%, i.e. it left a tenth of the pill empty. */
 .gen-scarlet-violet .pcg-wrr .pcg-emblem {
-    height: 4.2cqw;
+    height: 4.6cqw;
 }
-/* Dex band measured on the reference: y48.16-49.21%, centre 48.69%. This box is flex-centred and
-   3.4% tall, so top 48% put its centre at 49.70% - the line rode 1.01% low. */
+
+/* The amount rides beside a disc that now fills the band, so it has to carry the same weight - the
+   2.8cqw body size read as a footnote next to it. Same treatment tcg-gen already gives its "x2".
+   line-height:1 first: with the inherited 1.5 the glyphs sat inside a line box half again their own
+   height, and flex-centring that box left the INK 0.19% of card height above the disc's centre. */
+.gen-scarlet-violet .pcg-wk-amt {
+    font-size: 3.8cqw;
+    font-weight: 700;
+    line-height: 1;
+    /* Optical, not geometric, and measured on the INK rather than on the box.
+       Range.getBoundingClientRect returns the LINE box, so centring against it still left the
+       glyphs visibly high - the earlier 0.06em was calibrated on that lie. Scanning the rendered
+       pixels instead: with the row centred, the "2" ink centred 0.56% of card height ABOVE it,
+       because "×2" carries no descender and hangs in the top of its em box. At 3.8cqw (2.85% of
+       card height) that gap is 0.196em, so 0.26em total drops the ink onto the band's centreline. */
+    position: relative;
+    top: 0.26em;
+}
+/* Dex band measured on the reference: y48.16-49.21%, centre 48.69%.
+   This box is NOT flex-centred, whatever the previous comment here claimed - it is display:block
+   like the tcg-gen one, so its single line sits at the TOP of the 3.4% box with dead space beneath.
+   Centring the BOX at 48.69% (top 46.99% + half of 3.4%) therefore left the INK centred at 48.31%,
+   riding 0.38% high: the line half-overlapped the artwork above the silver strip instead of sitting
+   on it, which is exactly the failure the tcg-gen block below documents. Judge this one by the ink.
+   Measured, not guessed: 46.99% rendered ink at 47.23-49.38%, so +0.38% puts its centre on 48.69%.
+   Kept as display:block rather than fixed with flex - flex would make the box an anonymous flex
+   item and silently kill the `text-overflow: ellipsis` that a long language name still needs. */
 .gen-scarlet-violet .pcg-species {
     left: 10%;
-    top: 46.99%;
+    top: 47.37%;
     width: 80%;
     height: 3.4%;
     font-size: 2.8cqw;
@@ -994,11 +1021,17 @@
    them is 85.96%-89.13% (3.17% tall, centre 87.55%). The old 86.3% + 4.2% put the row's centre at
    88.4% - 0.86% low - and ran the box to 90.5%, i.e. straight through the lower rule. The 4.2cqw
    emblems are 3.0% of card height, so they sit inside the 3.17% band. */
+/* Box measured on the RENDERED CARD, not on the frame file: a 4x screenshot of .pcg, scanned down
+   an empty column of the weakness cell, puts the two silver rules at 85.83% and 89.47%. So the
+   pill's interior is 85.83%-89.47% - 3.64% tall, centre 87.65%.
+   Measuring the asset instead gave 85.67%-89.13% and sat the whole row 0.25% high, which is what
+   left the disc overlapping the top rule. Judge this one on the render: the frame is scaled and
+   resampled into the card, and its edges do not land where the source file's do. */
 .gen-scarlet-violet .pcg-wrr {
     left: 9%;
-    top: 85.96%;
+    top: 85.83%;
     width: 82%;
-    height: 3.17%;
+    height: 3.64%;
     font-size: 2.8cqw;
 }
 .gen-scarlet-violet .pcg-evolve {
@@ -1172,7 +1205,12 @@
     object-position: right center;
     z-index: 3;
 }
-/* tcg-gen & SV bake only weakness + retreat pills (no resistance) -> 2 columns. */
+/* tcg-gen & SV bake only weakness + retreat pills (no resistance) -> 2 columns, middle cell removed
+   so the retreat lands in the second one.
+   The SV frame does carry a hairline tick at 28.8% and a diagonal at 51.4-54%, and splitting the row
+   into three cells around them was tried: it moved the weakness group from 29.5% to 18.9%, off the
+   tick, but that is NOT where this card wants it. Keeping the two even columns - the group sits
+   across the tick the way the reference does. */
 .gen-tcg-gen .pcg-wrr,
 .gen-scarlet-violet .pcg-wrr {
     grid-template-columns: 1fr 1fr;

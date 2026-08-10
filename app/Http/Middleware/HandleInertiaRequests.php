@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Support\Seo;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
@@ -56,6 +57,10 @@ class HandleInertiaRequests extends Middleware
                 'enabled' => (bool) config('services.turnstile.enabled'),
                 'site_key' => config('services.turnstile.site_key'),
             ],
+            // Default metadata for any page that does not set its own. Shared rather than repeated
+            // per controller so a new page is indexable-and-describable by default instead of
+            // shipping an empty <head>.
+            'seo' => Seo::make(),
             'flash' => [
                 'status' => $request->session()->get('status'),
                 'success' => $request->session()->get('success'),

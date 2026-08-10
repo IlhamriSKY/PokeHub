@@ -1,4 +1,7 @@
 import { CardZoom } from '@/components/card-zoom';
+import GridBackdrop from '@/components/grid-backdrop';
+import LinePokeball from '@/components/line-pokeball';
+import LoginPanel from '@/components/login-panel';
 import { PokeCard } from '@/components/PokeCard';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -66,38 +69,6 @@ function Pokeball({ className, strokeWidth = 3 }: { className?: string; strokeWi
             <circle cx="32" cy="32" r="12" />
             <circle cx="32" cy="32" r="4.5" />
         </svg>
-    );
-}
-
-/**
- * The big hairline ball: draws itself in, then loops the capture wobble - tilt, counter-tilt,
- * settle, button flashes twice. Keyframes live in card.css next to `pokehub-pop`, and the whole
- * thing stands still for anyone with `prefers-reduced-motion` set.
- *
- * `still` keeps the drawing and drops the wobble, for the panel corners - one moving thing per
- * page is the budget, and it belongs on the closing CTA, not behind body copy.
- *
- * The WRAPPER owns positioning, not the svg: the wobble animates `transform`, which would
- * overwrite a `-translate-x-1/2` on the same element the instant the animation started. So the
- * caller's className goes on the wrapper and only the size lands on the svg.
- *
- * `--tilt` scales with the drawn size, not with taste: the degrees that read as a lively rock on
- * an 80px ball swing the edge of a 30rem one by tens of pixels.
- */
-function LinePokeball({ className, size, tilt = '9deg', still }: { className?: string; size: string; tilt?: string; still?: boolean }) {
-    return (
-        <div
-            aria-hidden="true"
-            className={`pokehub-ball pointer-events-none absolute ${still ? 'is-still' : ''} ${className}`}
-            style={{ '--tilt': tilt } as React.CSSProperties}
-        >
-            <svg viewBox="0 0 64 64" className={size} fill="none" stroke="currentColor" strokeWidth={0.8} strokeLinecap="round">
-                <circle className="pokehub-ball__draw" pathLength={1} cx="32" cy="32" r="29" />
-                <path className="pokehub-ball__draw" pathLength={1} d="M3 32h17M44 32h17" />
-                <circle className="pokehub-ball__draw" pathLength={1} cx="32" cy="32" r="12" />
-                <circle className="pokehub-ball__btn" cx="32" cy="32" r="4.5" />
-            </svg>
-        </div>
     );
 }
 
@@ -209,7 +180,7 @@ function ZoomOverlay({ entry, rarities, options, onClose }: { entry: ShowcaseEnt
     );
 }
 
-export default function Landing({ showcase }: { showcase: ShowcaseEntry[] }) {
+export default function Landing({ showcase, showLogin, status }: { showcase: ShowcaseEntry[]; showLogin?: boolean; status?: string }) {
     const { auth } = usePage<SharedData>().props;
     const { options } = useCardOptions();
     const rarities = useMemo(() => raritiesFromOptions(options), [options]);
@@ -218,6 +189,11 @@ export default function Landing({ showcase }: { showcase: ShowcaseEntry[] }) {
 
     const signedIn = !!auth?.user;
     const ctaHref = signedIn ? '/dashboard' : '/login';
+    // Signed out, /login is this same page with the panel open, so the visit must not reset scroll
+    // or tear down this component - otherwise "opening" the panel silently throws the visitor back
+    // to the top of the page they were reading. Signed in, ctaHref is /dashboard, a real navigation
+    // that should behave normally.
+    const ctaProps = signedIn ? {} : { preserveScroll: true, preserveState: true };
 
     return (
         <div className="bg-background text-foreground min-h-screen">
@@ -235,7 +211,9 @@ export default function Landing({ showcase }: { showcase: ShowcaseEntry[] }) {
                     <div className="ml-auto flex items-center gap-1.5">
                         <ThemeSwitch />
                         <Button asChild size="sm" variant={signedIn ? 'outline' : 'default'}>
-                            <Link href={ctaHref}>{signedIn ? 'Dashboard' : 'Sign in'}</Link>
+                            <Link href={ctaHref} {...ctaProps}>
+                                {signedIn ? 'Dashboard' : 'Sign in'}
+                            </Link>
                         </Button>
                     </div>
                 </div>
@@ -246,16 +224,7 @@ export default function Landing({ showcase }: { showcase: ShowcaseEntry[] }) {
                 {/* The three coloured radial glows that used to sit here are gone. A flat hairline
                     grid plus one oversized Poké Ball outline carries the whole backdrop - no blur,
                     no gradient wash, nothing competing with the cards for attention. */}
-                <div
-                    aria-hidden="true"
-                    className="pointer-events-none absolute inset-0 -z-10 opacity-[0.16] dark:opacity-[0.10]"
-                    style={{
-                        backgroundImage:
-                            'linear-gradient(to right, currentColor 1px, transparent 1px), linear-gradient(to bottom, currentColor 1px, transparent 1px)',
-                        backgroundSize: '56px 56px',
-                        maskImage: 'radial-gradient(70% 62% at 50% 0%, #000 0%, transparent 100%)',
-                    }}
-                />
+                <GridBackdrop />
 
                 {/* One rhythm for the whole page: every section below is py-14, so the hero closes
                     on the same 14 and only its TOP is bigger. The showcase heading used to sit 48px
@@ -278,7 +247,7 @@ export default function Landing({ showcase }: { showcase: ShowcaseEntry[] }) {
 
                     <div className="mt-7 flex flex-wrap items-center justify-center gap-3">
                         <Button asChild size="lg" className="h-12 gap-2.5 px-7 text-base">
-                            <Link href={ctaHref}>
+                            <Link href={ctaHref} {...ctaProps}>
                                 {!signedIn && <GithubMark />}
                                 {signedIn ? 'Go to dashboard' : 'Sign in with GitHub'}
                             </Link>
@@ -513,7 +482,7 @@ export default function Landing({ showcase }: { showcase: ShowcaseEntry[] }) {
                     </p>
                     <div className="mt-7">
                         <Button asChild size="lg" className="h-12 gap-2.5 px-7 text-base">
-                            <Link href={ctaHref}>
+                            <Link href={ctaHref} {...ctaProps}>
                                 {!signedIn && <GithubMark />}
                                 {signedIn ? 'Go to dashboard' : 'Continue with GitHub'}
                             </Link>
@@ -540,6 +509,9 @@ export default function Landing({ showcase }: { showcase: ShowcaseEntry[] }) {
             </footer>
 
             {zoom && <ZoomOverlay entry={zoom} rarities={rarities} options={options} onClose={closeZoom} />}
+            {/* Driven by the URL, not by local state: /login renders this page with showLogin set,
+                so the panel survives a reload and a shared link, and Back closes it. */}
+            {showLogin && !signedIn && <LoginPanel status={status} />}
         </div>
     );
 }

@@ -262,6 +262,20 @@ export const weaknessAmount = (gen: Generation) => (gen === 'tcg-gen' ? '+20' : 
 export const resistanceAmount = () => '−30';
 
 /**
+ * Does this era's card print a Resistance at all?
+ *
+ * Only Base Set does. TCG Pocket never had the stat, and Scarlet & Violet dropped it from the
+ * layout - a real SV card shows Weakness and Retreat and nothing between them. Both of those
+ * frames still bake the empty cell, which is why the row stays three columns wide and simply
+ * leaves the middle blank rather than closing the gap up.
+ *
+ * Enforced here rather than by hiding the cell in CSS: `matchOf` happily derives a resistance type
+ * from the profile's second language on every generation, so without this an SV card printed a
+ * resistance the era does not have the moment that language stopped colliding with the other two.
+ */
+export const hasResistance = (gen: Generation) => gen === '1-gen';
+
+/**
  * HP as a card actually prints it: a multiple of 10, floor 30, ceiling 340 (VMAX territory).
  * Still the follower count - just mapped onto the range real cards use. The raw number is not
  * lost, it moved to the dex line.

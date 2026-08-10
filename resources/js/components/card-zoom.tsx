@@ -2,7 +2,20 @@ import { X } from 'lucide-react';
 import { useEffect, type ReactNode } from 'react';
 
 // Takes the rendered card as children so callers keep their own frame props.
-export function CardZoom({ children, caption, sub, onClose }: { children: ReactNode; caption?: string; sub?: string; onClose: () => void }) {
+export function CardZoom({
+    children,
+    caption,
+    sub,
+    actions,
+    onClose,
+}: {
+    children: ReactNode;
+    caption?: string;
+    sub?: string;
+    /** Optional controls under the caption - the gallery puts its Apply button here. */
+    actions?: ReactNode;
+    onClose: () => void;
+}) {
     useEffect(() => {
         const prev = document.body.style.overflow;
         document.body.style.overflow = 'hidden';
@@ -36,6 +49,7 @@ export function CardZoom({ children, caption, sub, onClose }: { children: ReactN
                 {children}
                 {caption && <p className="mt-4 text-center text-sm font-medium text-white">{caption}</p>}
                 {sub && <p className="text-center text-xs text-white/70">{sub}</p>}
+                {actions && <div className="mt-4 flex justify-center gap-2">{actions}</div>}
             </div>
         </div>
     );

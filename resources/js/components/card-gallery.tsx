@@ -1,7 +1,12 @@
+import { CardZoom } from '@/components/card-zoom';
 import { PokeCard } from '@/components/PokeCard';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
     attributeFramesForGen,
     DEFAULT_AXES,
+    dualSupported,
     elementsForGen,
     isTrainerVariant,
     resolveOverrides,
@@ -13,10 +18,16 @@ import {
 import { type CardOptions } from '@/lib/options';
 import { langType, rarityOf, subtypesFromOptions, type Profile, type Rarity } from '@/lib/rarities';
 import { X } from 'lucide-react';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 
 type Tile = { label: string; axes: Partial<Axes>; rarity: string };
 type Section = { title: string; tiles: Tile[] };
+
+const GEN_LABEL: Record<string, string> = {
+    '1-gen': 'Base Set',
+    'tcg-gen': 'TCG Pocket',
+    'scarlet-violet': 'Scarlet & Violet',
+};
 
 /**
  * Every scenario the lab can produce for the card in hand, one axis at a time: each tile holds
@@ -54,11 +65,46 @@ export function buildSections(options: CardOptions, axes: Partial<Axes>, rarity:
         (options.variant ?? []).filter((v) => v.generation === gen).map((o) => ({ label: o.label, axes: { ...a, variant: o.slug }, rarity })),
     );
 
+    /*
+     * The templates the OTHER generations own, so the gallery is the whole possibility space rather
+     * than this generation's slice of it.
+     *
+     * Each tile carries its generation with it. Setting `variant` alone would be a lie: a
+     * `full-art-ex` slug on Base Set has no asset behind it, so the tile would quietly draw a plain
+     * card while claiming to be Full Art EX. `regular` is skipped because the Generation section
+     * above already shows exactly that card in every generation.
+     *
+     * Kept as its OWN section, not merged into the one above, because rollAxes reads
+     * `legal('Variant / template', 'variant')` and takes only the variant slug from each tile - it
+     * would happily pair another generation's template with the current frame and produce the
+     * illegal combination its own comment promises it never will.
+     */
+    push(
+        'Variant · other generations',
+        (options.variant ?? [])
+            .filter((v) => v.generation !== gen && v.slug !== 'regular')
+            .map((o) => ({
+                label: `${o.label} · ${GEN_LABEL[o.generation] ?? o.generation}`,
+                axes: { ...a, generation: o.generation, variant: o.slug, frame: 'none' },
+                rarity,
+            })),
+    );
+
     if (!isTrainer) {
         push(
             'Element / type',
             elementsForGen(options.element ?? [], gen).map((o) => ({ label: o.label, axes: { ...a, element: o.slug }, rarity })),
         );
+
+        // The axis that was missing from this gallery entirely: the panel has offered a Dual type
+        // for every generation, but there was no tile row for it, so there was no way to SEE what a
+        // second energy disc looks like without setting it and watching the single preview.
+        push('Dual type', [
+            { label: 'None', axes: { ...a, dualType: 'auto' }, rarity },
+            ...(options.element ?? [])
+                .filter((o) => dualSupported(gen, o.slug))
+                .map((o) => ({ label: o.label, axes: { ...a, dualType: o.slug }, rarity })),
+        ]);
 
         push('Subtype (stage)', [
             { label: 'Auto', axes: { ...a, subtype: 'auto' }, rarity },
@@ -272,31 +318,85 @@ export function CardGallery({
     onPick: (axes: Partial<Axes>, rarity: string) => void;
     onClose: () => void;
 }) {
+    const [query, setQuery] = useState('');
+    const [axis, setAxis] = useState('all');
+    // Clicking a tile no longer applies it. It opens this, and Apply lives in there - the grid is
+    // 188 cards of roughly thumbnail size, where "which one did I just click" is a fair question
+    // and an accidental apply silently rewrote the card being edited.
+    const [zoom, setZoom] = useState<Tile | null>(null);
+
     useEffect(() => {
         const prev = document.body.style.overflow;
         document.body.style.overflow = 'hidden';
-        const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
+        // Escape closes the ZOOM first when one is open. Both this and CardZoom listen on window,
+        // so without the guard a single Escape would collapse the zoom and the whole gallery.
+        const onKey = (e: KeyboardEvent) => e.key === 'Escape' && !zoom && onClose();
         window.addEventListener('keydown', onKey);
 
         return () => {
             document.body.style.overflow = prev;
             window.removeEventListener('keydown', onKey);
         };
-    }, [onClose]);
+    }, [onClose, zoom]);
 
-    const sections = buildSections(options, axes, rarity, rarities);
-    const total = sections.reduce((n, s) => n + s.tiles.length, 0);
+    const all = buildSections(options, axes, rarity, rarities);
+    const total = all.reduce((n, s) => n + s.tiles.length, 0);
+
+    const q = query.trim().toLowerCase();
+    const sections = all
+        .filter((s) => axis === 'all' || s.title === axis)
+        // A section whose TITLE matches keeps all of its tiles: searching "dual" should hand over
+        // the whole Dual type row, not the one tile that happens to repeat the word.
+        .map((s) => (!q || s.title.toLowerCase().includes(q) ? s : { ...s, tiles: s.tiles.filter((t) => t.label.toLowerCase().includes(q)) }))
+        .filter((s) => s.tiles.length > 0);
+    const shown = sections.reduce((n, s) => n + s.tiles.length, 0);
 
     return (
         <div className="bg-background fixed inset-0 z-50 overflow-y-auto">
-            <div className="bg-background/95 sticky top-0 z-10 flex items-center gap-3 border-b px-4 py-3 backdrop-blur">
-                <h2 className="text-sm font-semibold">All variants</h2>
-                <span className="text-muted-foreground text-xs">
-                    {total} scenarios · {sections.length} axes · click one to apply
-                </span>
-                <button type="button" onClick={onClose} aria-label="Close" className="hover:bg-muted ml-auto rounded-full p-2 transition-colors">
-                    <X className="h-4 w-4" />
-                </button>
+            <div className="bg-background/95 sticky top-0 z-10 border-b px-4 py-3 backdrop-blur">
+                <div className="flex items-center gap-3">
+                    <h2 className="text-sm font-semibold">All variants</h2>
+                    <span className="text-muted-foreground text-xs">
+                        {q || axis !== 'all' ? `${shown} of ${total}` : `${total} scenarios`} · {sections.length} axes · click a card to preview
+                    </span>
+                    <button type="button" onClick={onClose} aria-label="Close" className="hover:bg-muted ml-auto rounded-full p-2 transition-colors">
+                        <X className="h-4 w-4" />
+                    </button>
+                </div>
+
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                    <Input
+                        className="h-9 flex-1 basis-56"
+                        value={query}
+                        onChange={(e) => setQuery(e.target.value)}
+                        placeholder="Search variants - e.g. fairy, holo, trainer, rainbow"
+                    />
+                    <Select value={axis} onValueChange={setAxis}>
+                        <SelectTrigger className="h-9 w-56">
+                            <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="all">All axes</SelectItem>
+                            {all.map((s) => (
+                                <SelectItem key={s.title} value={s.title}>
+                                    {s.title} ({s.tiles.length})
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                    {(q || axis !== 'all') && (
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setQuery('');
+                                setAxis('all');
+                            }}
+                            className="text-muted-foreground hover:text-foreground h-9 rounded-md border px-2.5 text-xs"
+                        >
+                            Reset
+                        </button>
+                    )}
+                </div>
             </div>
 
             <div className="space-y-8 p-4">
@@ -311,11 +411,9 @@ export function CardGallery({
                                     <li key={`${s.title}-${t.label}`} className="mx-auto flex w-full max-w-[160px] flex-col items-center gap-1.5">
                                         <button
                                             type="button"
-                                            onClick={() => {
-                                                onPick(t.axes, t.rarity);
-                                                onClose();
-                                            }}
-                                            className="focus-visible:ring-ring w-full cursor-pointer rounded-lg transition-transform duration-200 hover:-translate-y-1 focus-visible:ring-2 focus-visible:outline-none"
+                                            onClick={() => setZoom({ ...t, label: `${s.title} · ${t.label}` })}
+                                            aria-label={`Preview ${t.label}`}
+                                            className="focus-visible:ring-ring w-full cursor-zoom-in rounded-lg transition-transform duration-200 hover:-translate-y-1 focus-visible:ring-2 focus-visible:outline-none"
                                         >
                                             <PokeCard
                                                 profile={{ ...profile, rarity: t.rarity }}
@@ -330,7 +428,39 @@ export function CardGallery({
                         </ul>
                     </section>
                 ))}
+
+                {sections.length === 0 && <p className="text-muted-foreground py-16 text-center text-sm">No variant matches that search.</p>}
             </div>
+
+            {zoom && (
+                <CardZoom
+                    caption={zoom.label}
+                    sub="Preview only - nothing is changed until you apply"
+                    onClose={() => setZoom(null)}
+                    actions={
+                        <>
+                            <Button
+                                onClick={() => {
+                                    onPick(zoom.axes, zoom.rarity);
+                                    setZoom(null);
+                                    onClose();
+                                }}
+                            >
+                                Apply this variant
+                            </Button>
+                            <Button variant="secondary" onClick={() => setZoom(null)}>
+                                Back
+                            </Button>
+                        </>
+                    }
+                >
+                    <PokeCard
+                        profile={{ ...profile, rarity: zoom.rarity }}
+                        rarity={rarityOf(rarities, zoom.rarity)}
+                        {...resolveOverrides(options, zoom.axes, rarityOf(rarities, zoom.rarity))}
+                    />
+                </CardZoom>
+            )}
         </div>
     );
 }

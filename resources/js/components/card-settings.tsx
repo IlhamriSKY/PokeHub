@@ -1,10 +1,12 @@
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
+    ATTRIBUTE_FRAMES,
     DEFAULT_AXES,
     attributeFramesForGen,
+    dualSupported,
     elementSupported,
     elementsForGen,
     isTrainerVariant,
@@ -16,35 +18,110 @@ import {
 } from '@/lib/cardModel';
 import { type CardOptions } from '@/lib/options';
 import { subtypesFromOptions, type Rarity } from '@/lib/rarities';
-import { type ReactNode } from 'react';
+import { createContext, useContext, useState, type ReactNode } from 'react';
 
 const AUTO = 'auto';
 // pokecardgenerator's TCG Pocket picker labels three types by their older TCG names.
 // Slugs stay lightning/metal/darkness everywhere; only this label changes.
 const TCG_TYPE_LABEL: Record<string, string> = { lightning: 'Electric', metal: 'Steel', darkness: 'Dark' };
-// Upstream's DUAL TYPE list drops Dark. 1-gen ships no dark frame at all, so this only bites here.
-const DUAL_DROPS_DARK = new Set(['tcg-gen', 'scarlet-violet']);
 
 /**
- * Can `slug` be this generation's SECOND type?
- *
- * Not the same question as `elementSupported`, which asks for a frame. A dual type only ever draws
- * an energy disc beside the primary one, so upstream offers Fairy as a dual on Scarlet & Violet
- * even though SV ships no Fairy frame. Measured on all three generations: 1-gen dual == its own 7
- * types, tcg-gen 11 types -> 10 duals, SV 10 types -> 10 duals (minus Dark, plus Fairy). Deriving
- * the list from the frame-gated one alone lost Fairy on SV, the single entry that differs.
+ * The lab's search box, read by every Field. A context rather than a prop because the fields are
+ * rendered inline under their own generation conditions - threading a query through each one would
+ * mean touching fourteen call sites to add a filter that is off by default anyway.
  */
-const dualSupported = (generation: string, slug: string): boolean =>
-    DUAL_DROPS_DARK.has(generation)
-        ? slug !== 'darkness' && (slug === 'fairy' || elementSupported(generation, slug))
-        : elementSupported(generation, slug);
+const SearchCtx = createContext('');
 
-function Field({ label, children }: { label: string; children: ReactNode }) {
+/**
+ * One labelled control. When a search is active it removes ITSELF if neither its name nor any of
+ * its option labels match, which is what makes the box find "fairy" (an option buried inside two
+ * dropdowns) as readily as "dual" (a field name).
+ */
+function Field({ label, keywords, children }: { label: string; keywords?: string[]; children: ReactNode }) {
+    const q = useContext(SearchCtx).trim().toLowerCase();
+    if (q && !`${label} ${(keywords ?? []).join(' ')}`.toLowerCase().includes(q)) return null;
+
     return (
         <div className="space-y-1.5">
             <Label className="text-muted-foreground text-xs">{label}</Label>
             {children}
         </div>
+    );
+}
+
+/** Option labels for the search index, so a Field can be found by what is inside it. */
+const kw = (list: { label: string }[] | undefined) => (list ?? []).map((o) => o.label);
+
+const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+
+const GEN_LABEL: Record<string, string> = {
+    '1-gen': 'Base Set',
+    'tcg-gen': 'TCG Pocket',
+    'scarlet-violet': 'Scarlet & Violet',
+};
+
+type Opt = { slug: string; label: string; generation?: string | null };
+
+/**
+ * A select body split into what THIS generation can draw and what it cannot.
+ *
+ * With `showAll` off (the user dashboard) only the drawable half is listed, which is how this panel
+ * has always behaved. With it on (the admin lab) the rest is listed too but DISABLED, under a
+ * heading naming the generation that owns it - so an admin can see the whole possibility space at a
+ * glance instead of discovering it by cycling the Generation dropdown.
+ *
+ * Disabled rather than selectable on purpose. The lab's rule is that what you can pick is what gets
+ * drawn: a variant or frame with no asset for the current generation does not error, it silently
+ * falls back to the plain frame, so making these selectable would let an admin save a card whose
+ * stored axes disagree with every render of it.
+ */
+function GenOptions({ all, ok, showAll, label }: { all: Opt[]; ok: Opt[]; showAll: boolean; label?: (o: Opt) => string }) {
+    const text = label ?? ((o: Opt) => o.label);
+
+    /*
+     * Deduped by SLUG, not taken as rows. card_assets stores one variant row PER GENERATION, so
+     * `regular` and `trainer` each exist three times and `full-art` twice - twelve rows for six
+     * distinct templates. Emitting a row per record would put duplicate values in the Select, which
+     * Radix cannot address (two items answering to "regular") and React warns about as a duplicate
+     * key. `seen` is primed with what is already on offer so a template stays in the enabled half.
+     */
+    const rest: Opt[] = [];
+    if (showAll) {
+        const seen = new Set(ok.map((o) => o.slug));
+        for (const o of all) {
+            if (seen.has(o.slug)) continue;
+            seen.add(o.slug);
+            rest.push(o);
+        }
+    }
+
+    // Which generations DO own this slug - all of them, not just whichever row happened to be first.
+    // "Full art" is a tcg-gen and an SV template both, and naming only one of them would be a lie.
+    const gensFor = (slug: string) =>
+        [...new Set(all.filter((o) => o.slug === slug && o.generation).map((o) => o.generation as string))].map((g) => GEN_LABEL[g] ?? g).join(', ');
+
+    return (
+        <>
+            {ok.map((o) => (
+                <SelectItem key={o.slug} value={o.slug}>
+                    {text(o)}
+                </SelectItem>
+            ))}
+            {rest.length > 0 && (
+                <SelectGroup>
+                    <SelectLabel className="text-muted-foreground text-[10px] font-normal">Not on this generation</SelectLabel>
+                    {rest.map((o) => {
+                        const gens = gensFor(o.slug);
+                        return (
+                            <SelectItem key={o.slug} value={o.slug} disabled>
+                                {text(o)}
+                                {gens ? ` · ${gens}` : ''}
+                            </SelectItem>
+                        );
+                    })}
+                </SelectGroup>
+            )}
+        </>
     );
 }
 
@@ -60,6 +137,7 @@ export function CardSettings({
     topLang,
     onChange,
     onRarityChange,
+    showAll = false,
 }: {
     options: CardOptions;
     axes: Partial<Axes>;
@@ -68,9 +146,20 @@ export function CardSettings({
     topLang?: string;
     onChange: (next: Partial<Axes>) => void;
     onRarityChange: (next: string) => void;
+    /**
+     * Admin lab: list every option the product has, greying out the ones this generation cannot
+     * draw, and keep generation-only controls on screen instead of unmounting them. Off for the
+     * user dashboard, which only wants the choices that apply to the card in front of it.
+     */
+    showAll?: boolean;
 }) {
     const a: Axes = { ...DEFAULT_AXES, ...axes };
     const set = (patch: Partial<Axes>) => onChange({ ...a, ...patch });
+
+    const [query, setQuery] = useState('');
+    // Lets the lab collapse back to "only what I can actually pick" without losing the full map.
+    const [hideUnavailable, setHideUnavailable] = useState(false);
+    const listAll = showAll && !hideUnavailable;
 
     // Frames and variants are generation-scoped exactly like pokecardgenerator: 1st gen has no
     // frame styles at all, and each generation offers its own template set.
@@ -116,280 +205,290 @@ export function CardSettings({
     };
 
     return (
-        <div className="grid grid-cols-2 gap-3">
-            <div className="col-span-2">
-                <Field label="Rarity">
-                    <Select value={rarity} onValueChange={onRarityChange}>
-                        <SelectTrigger className="h-9">
-                            <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                            {rarities.map((r) => (
-                                <SelectItem key={r.key} value={r.key}>
-                                    {r.label} · {r.era}
-                                </SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-                </Field>
-            </div>
+        <SearchCtx.Provider value={showAll ? query : ''}>
+            <div className="grid grid-cols-2 gap-3">
+                {/* Lab only. Fourteen controls is a lot to scan, and the answer to "where is Dual type"
+                should not be "scroll". Matches field names AND the labels inside them, so a search
+                for an option finds the dropdown holding it. */}
+                {showAll && (
+                    <div className="col-span-2 flex flex-wrap items-center gap-2">
+                        <Input
+                            className="h-9 flex-1 basis-48"
+                            value={query}
+                            onChange={(e) => setQuery(e.target.value)}
+                            placeholder="Search settings and options - e.g. dual, fairy, holo"
+                        />
+                        {query && (
+                            <button
+                                type="button"
+                                onClick={() => setQuery('')}
+                                className="text-muted-foreground hover:text-foreground h-9 rounded-md border px-2.5 text-xs"
+                            >
+                                Clear
+                            </button>
+                        )}
+                        <label className="text-muted-foreground flex cursor-pointer items-center gap-2 text-xs whitespace-nowrap">
+                            <Checkbox checked={hideUnavailable} onCheckedChange={(v) => setHideUnavailable(v === true)} />
+                            Hide unavailable
+                        </label>
+                    </div>
+                )}
 
-            <div className="col-span-2">
-                <Field label="Generation (card frame)">
-                    <Select value={a.generation} onValueChange={changeGeneration}>
-                        <SelectTrigger className="h-9">
-                            <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                            {(options.generation ?? []).map((o) => (
-                                <SelectItem key={o.slug} value={o.slug}>
-                                    {o.label}
-                                </SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-                </Field>
-            </div>
+                <div className="col-span-2">
+                    <Field label="Rarity" keywords={rarities.map((r) => `${r.label} ${r.era}`)}>
+                        <Select value={rarity} onValueChange={onRarityChange}>
+                            <SelectTrigger className="h-9">
+                                <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {rarities.map((r) => (
+                                    <SelectItem key={r.key} value={r.key}>
+                                        {r.label} · {r.era}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </Field>
+                </div>
 
-            {/* Variant sits under Generation because it GATES the rest. */}
-            <div className="col-span-2">
-                <Field label="Variant / template">
-                    <Select value={a.variant} onValueChange={changeVariant}>
-                        <SelectTrigger className="h-9">
-                            <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                            {genVariants.map((o) => (
-                                <SelectItem key={o.slug} value={o.slug}>
-                                    {o.label}
-                                </SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-                </Field>
-            </div>
-
-            {!isTrainer && (
-                <Field label="Element / type">
-                    <Select value={shownElement} onValueChange={(v) => set({ element: v })}>
-                        <SelectTrigger className="h-9">
-                            <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                            {elementOptions.map((o) => (
-                                <SelectItem key={o.slug} value={o.slug}>
-                                    {typeLabel(o)}
-                                </SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-                </Field>
-            )}
-
-            {!isTrainer && (
-                <Field label="Dual type">
-                    <Select value={a.dualType} onValueChange={(v) => set({ dualType: v })}>
-                        <SelectTrigger className="h-9">
-                            <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value={AUTO}>None</SelectItem>
-                            {dualOptions.map((o) => (
-                                <SelectItem key={o.slug} value={o.slug}>
-                                    {typeLabel(o)}
-                                </SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-                </Field>
-            )}
-
-            {genFrames.length > 0 && (
-                <Field label="Frame">
-                    <Select value={a.frame} onValueChange={(v) => set({ frame: v })}>
-                        <SelectTrigger className="h-9">
-                            <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="none">None</SelectItem>
-                            {genFrames.map((o) => (
-                                <SelectItem key={o.slug} value={o.slug}>
-                                    {o.label}
-                                </SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-                </Field>
-            )}
-
-            <Field label="Glare / holo">
-                <Select value={a.glare} onValueChange={(v) => set({ glare: v })}>
-                    <SelectTrigger className="h-9">
-                        <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value="auto">Auto (from rarity)</SelectItem>
-                        {(options.glare ?? []).map((o) => (
-                            <SelectItem key={o.slug} value={o.slug}>
-                                {o.label}
-                            </SelectItem>
-                        ))}
-                    </SelectContent>
-                </Select>
-            </Field>
-
-            {!isTrainer && (
-                <Field label="Subtype (stage)">
-                    <Select value={a.subtype} onValueChange={(v) => set({ subtype: v })}>
-                        <SelectTrigger className="h-9">
-                            <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value={AUTO}>Auto</SelectItem>
-                            {subtypeOptions.map((s) => (
-                                <SelectItem key={s.slug} value={s.slug}>
-                                    {s.label}
-                                </SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-                </Field>
-            )}
-
-            <Field label="Rarity mark">
-                <Select value={a.rarityMark} onValueChange={(v) => set({ rarityMark: v })}>
-                    <SelectTrigger className="h-9">
-                        <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value="auto">Auto</SelectItem>
-                        <SelectItem value="none">None</SelectItem>
-                        {(options.rarity ?? [])
-                            .filter((o) => !o.generation || o.generation === a.generation)
-                            .map((o) => (
-                                <SelectItem key={o.slug} value={o.slug}>
-                                    {o.label}
-                                </SelectItem>
-                            ))}
-                    </SelectContent>
-                </Select>
-            </Field>
-
-            {/* Attribute frame: the border around the art window. TCG Pocket only. */}
-            {attributeFramesForGen(a.generation).length > 0 && (
-                <Field label="Attribute frame">
-                    <Select value={a.attributeFrame} onValueChange={(v) => set({ attributeFrame: v })}>
-                        <SelectTrigger className="h-9">
-                            <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="none">None</SelectItem>
-                            {attributeFramesForGen(a.generation).map((s) => (
-                                <SelectItem key={s} value={s}>
-                                    {s.charAt(0).toUpperCase() + s.slice(1)}
-                                </SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-                </Field>
-            )}
-
-            {/* Tag / badge / name icon are TCG + SV only: 1st gen has none of them upstream. */}
-            {supportsChrome(a.generation) && (
-                <Field label="Tag stamp">
-                    <Select value={a.tag} onValueChange={(v) => set({ tag: v })}>
-                        <SelectTrigger className="h-9">
-                            <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="none">None</SelectItem>
-                            {tagOptions.map((o) => (
-                                <SelectItem key={o.slug} value={o.slug}>
-                                    {o.label}
-                                </SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-                </Field>
-            )}
-
-            {supportsChrome(a.generation) && (
-                <Field label="Set badge">
-                    <Select value={a.badge} onValueChange={(v) => set({ badge: v })}>
-                        <SelectTrigger className="h-9">
-                            <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="none">None</SelectItem>
-                            {(options.badge ?? []).map((o) => (
-                                <SelectItem key={o.slug} value={o.slug}>
-                                    {o.label}
-                                </SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-                </Field>
-            )}
-
-            {!isTrainer && supportsChrome(a.generation) && (
-                <Field label="Name icon">
-                    <Select value={a.icon} onValueChange={(v) => set({ icon: v })}>
-                        <SelectTrigger className="h-9">
-                            <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="none">None</SelectItem>
-                            {(options.icon ?? [])
-                                .filter((o) => !o.generation || o.generation === a.generation)
-                                .map((o) => (
+                <div className="col-span-2">
+                    <Field label="Generation (card frame)" keywords={kw(options.generation)}>
+                        <Select value={a.generation} onValueChange={changeGeneration}>
+                            <SelectTrigger className="h-9">
+                                <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {(options.generation ?? []).map((o) => (
                                     <SelectItem key={o.slug} value={o.slug}>
                                         {o.label}
                                     </SelectItem>
                                 ))}
+                            </SelectContent>
+                        </Select>
+                    </Field>
+                </div>
+
+                {/* Variant sits under Generation because it GATES the rest. */}
+                <div className="col-span-2">
+                    <Field label="Variant / template" keywords={kw(options.variant)}>
+                        <Select value={a.variant} onValueChange={changeVariant}>
+                            <SelectTrigger className="h-9">
+                                <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <GenOptions all={options.variant ?? []} ok={genVariants} showAll={listAll} />
+                            </SelectContent>
+                        </Select>
+                    </Field>
+                </div>
+
+                {!isTrainer && (
+                    <Field label="Element / type" keywords={kw(options.element)}>
+                        <Select value={shownElement} onValueChange={(v) => set({ element: v })}>
+                            <SelectTrigger className="h-9">
+                                <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <GenOptions all={options.element ?? []} ok={elementOptions} showAll={listAll} label={typeLabel} />
+                            </SelectContent>
+                        </Select>
+                    </Field>
+                )}
+
+                {!isTrainer && (
+                    <Field label="Dual type" keywords={kw(options.element)}>
+                        <Select value={a.dualType} onValueChange={(v) => set({ dualType: v })}>
+                            <SelectTrigger className="h-9">
+                                <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value={AUTO}>None</SelectItem>
+                                <GenOptions all={options.element ?? []} ok={dualOptions} showAll={listAll} label={typeLabel} />
+                            </SelectContent>
+                        </Select>
+                    </Field>
+                )}
+
+                {/* Every frame style upstream ships belongs to TCG Pocket, so on Base Set and Scarlet &
+                Violet this control has nothing to offer and normally unmounts. In the lab it stays,
+                greyed, rather than vanishing - "no frame styles on this generation" is itself a fact
+                an admin is looking for. */}
+                {(genFrames.length > 0 || listAll) && (
+                    <Field label="Frame" keywords={kw(options.frame)}>
+                        <Select value={a.frame} onValueChange={(v) => set({ frame: v })}>
+                            <SelectTrigger className="h-9">
+                                <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="none">None</SelectItem>
+                                <GenOptions all={options.frame ?? []} ok={genFrames} showAll={listAll} />
+                            </SelectContent>
+                        </Select>
+                    </Field>
+                )}
+
+                <Field label="Glare / holo" keywords={kw(options.glare)}>
+                    <Select value={a.glare} onValueChange={(v) => set({ glare: v })}>
+                        <SelectTrigger className="h-9">
+                            <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="auto">Auto (from rarity)</SelectItem>
+                            {(options.glare ?? []).map((o) => (
+                                <SelectItem key={o.slug} value={o.slug}>
+                                    {o.label}
+                                </SelectItem>
+                            ))}
                         </SelectContent>
                     </Select>
                 </Field>
-            )}
 
-            {/* One effect, not the playground's stack of five: the saved blob holds a single slug,
-                so offering five here would silently drop four on save. */}
-            <Field label="Visual effect">
-                <Select value={a.effect} onValueChange={(v) => set({ effect: v })}>
-                    <SelectTrigger className="h-9">
-                        <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value="none">None</SelectItem>
-                        {(options.effect ?? []).map((o) => (
-                            <SelectItem key={o.slug} value={o.slug}>
-                                {o.label}
-                            </SelectItem>
-                        ))}
-                    </SelectContent>
-                </Select>
-            </Field>
-
-            {canEvolve && (
-                <div className="col-span-2">
-                    <Field label="Evolves from">
-                        <Input
-                            className="h-9"
-                            value={a.evolvesFrom}
-                            onChange={(e) => set({ evolvesFrom: e.target.value })}
-                            placeholder="e.g. Charmeleon (blank = none)"
-                        />
+                {!isTrainer && (
+                    <Field label="Subtype (stage)" keywords={kw(subtypesFromOptions(options))}>
+                        <Select value={a.subtype} onValueChange={(v) => set({ subtype: v })}>
+                            <SelectTrigger className="h-9">
+                                <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value={AUTO}>Auto</SelectItem>
+                                <GenOptions all={subtypesFromOptions(options)} ok={subtypeOptions} showAll={listAll} />
+                            </SelectContent>
+                        </Select>
                     </Field>
-                </div>
-            )}
+                )}
 
-            {a.generation === '1-gen' && (
-                <div className="col-span-2">
-                    <label className="flex cursor-pointer items-center gap-2">
-                        <Checkbox checked={a.firstEdition} onCheckedChange={(v) => set({ firstEdition: v === true })} />
-                        <span className="text-muted-foreground text-xs">1st edition stamp</span>
-                    </label>
-                </div>
-            )}
-        </div>
+                <Field label="Rarity mark" keywords={kw(options.rarity)}>
+                    <Select value={a.rarityMark} onValueChange={(v) => set({ rarityMark: v })}>
+                        <SelectTrigger className="h-9">
+                            <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="auto">Auto</SelectItem>
+                            <SelectItem value="none">None</SelectItem>
+                            <GenOptions
+                                all={options.rarity ?? []}
+                                ok={(options.rarity ?? []).filter((o) => !o.generation || o.generation === a.generation)}
+                                showAll={listAll}
+                            />
+                        </SelectContent>
+                    </Select>
+                </Field>
+
+                {/* Attribute frame: the border around the art window. TCG Pocket only. */}
+                {(attributeFramesForGen(a.generation).length > 0 || listAll) && (
+                    <Field label="Attribute frame" keywords={ATTRIBUTE_FRAMES.map(cap)}>
+                        <Select value={a.attributeFrame} onValueChange={(v) => set({ attributeFrame: v })}>
+                            <SelectTrigger className="h-9">
+                                <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="none">None</SelectItem>
+                                <GenOptions
+                                    all={ATTRIBUTE_FRAMES.map((s) => ({ slug: s, label: cap(s), generation: 'tcg-gen' }))}
+                                    ok={attributeFramesForGen(a.generation).map((s) => ({ slug: s, label: cap(s) }))}
+                                    showAll={listAll}
+                                />
+                            </SelectContent>
+                        </Select>
+                    </Field>
+                )}
+
+                {/* Tag / badge / name icon are TCG + SV only: 1st gen has none of them upstream. In the
+                lab they stay on screen greyed, so the absence is visible rather than invisible. */}
+                {(supportsChrome(a.generation) || listAll) && (
+                    <Field label="Tag stamp" keywords={kw(options.tag)}>
+                        <Select value={a.tag} onValueChange={(v) => set({ tag: v })}>
+                            <SelectTrigger className="h-9">
+                                <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="none">None</SelectItem>
+                                <GenOptions all={options.tag ?? []} ok={supportsChrome(a.generation) ? tagOptions : []} showAll={listAll} />
+                            </SelectContent>
+                        </Select>
+                    </Field>
+                )}
+
+                {(supportsChrome(a.generation) || listAll) && (
+                    <Field label="Set badge" keywords={kw(options.badge)}>
+                        <Select value={a.badge} onValueChange={(v) => set({ badge: v })}>
+                            <SelectTrigger className="h-9">
+                                <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="none">None</SelectItem>
+                                <GenOptions
+                                    all={options.badge ?? []}
+                                    ok={supportsChrome(a.generation) ? (options.badge ?? []) : []}
+                                    showAll={listAll}
+                                />
+                            </SelectContent>
+                        </Select>
+                    </Field>
+                )}
+
+                {!isTrainer && (supportsChrome(a.generation) || listAll) && (
+                    <Field label="Name icon" keywords={kw(options.icon)}>
+                        <Select value={a.icon} onValueChange={(v) => set({ icon: v })}>
+                            <SelectTrigger className="h-9">
+                                <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="none">None</SelectItem>
+                                <GenOptions
+                                    all={options.icon ?? []}
+                                    ok={
+                                        supportsChrome(a.generation)
+                                            ? (options.icon ?? []).filter((o) => !o.generation || o.generation === a.generation)
+                                            : []
+                                    }
+                                    showAll={listAll}
+                                />
+                            </SelectContent>
+                        </Select>
+                    </Field>
+                )}
+
+                {/* One effect, not the playground's stack of five: the saved blob holds a single slug,
+                so offering five here would silently drop four on save. */}
+                <Field label="Visual effect" keywords={kw(options.effect)}>
+                    <Select value={a.effect} onValueChange={(v) => set({ effect: v })}>
+                        <SelectTrigger className="h-9">
+                            <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="none">None</SelectItem>
+                            {(options.effect ?? []).map((o) => (
+                                <SelectItem key={o.slug} value={o.slug}>
+                                    {o.label}
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                </Field>
+
+                {canEvolve && (
+                    <div className="col-span-2">
+                        <Field label="Evolves from" keywords={['stage', 'evolution']}>
+                            <Input
+                                className="h-9"
+                                value={a.evolvesFrom}
+                                onChange={(e) => set({ evolvesFrom: e.target.value })}
+                                placeholder="e.g. Charmeleon (blank = none)"
+                            />
+                        </Field>
+                    </div>
+                )}
+
+                {a.generation === '1-gen' && (
+                    <div className="col-span-2">
+                        <label className="flex cursor-pointer items-center gap-2">
+                            <Checkbox checked={a.firstEdition} onCheckedChange={(v) => set({ firstEdition: v === true })} />
+                            <span className="text-muted-foreground text-xs">1st edition stamp</span>
+                        </label>
+                    </div>
+                )}
+            </div>
+        </SearchCtx.Provider>
     );
 }

@@ -9,6 +9,10 @@ interface LoginProps {
 /**
  * GitHub is the only way in: a PokeHub card IS a GitHub profile, so an account without
  * one has nothing to show. No password form, no sign-up - the callback creates the user.
+ *
+ * No captcha here on purpose. GitHub's own OAuth screen is already the bot check, so a Turnstile
+ * in front of it would just be a challenge guarding a challenge. Turnstile stays where the cost
+ * is real: the dashboard's card regeneration, which spends a paid AI call per press.
  */
 export default function Login({ status }: LoginProps) {
     return (

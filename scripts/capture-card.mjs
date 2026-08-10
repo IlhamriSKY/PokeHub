@@ -4,7 +4,7 @@
  * static image: the foil is layered blend modes following `--pointer-x/y`, so the shots are taken
  * while driving a mouse across the card.
  *
- *   node scripts/capture-card.mjs <url> <out.gif|out.svg> [frames] [width] [delayMs]
+ *   node scripts/capture-card.mjs <url> <out.gif|out.svg|out.png> [frames] [width] [delayMs]
  *
  * The format comes from the output extension. `svg` takes ONE shot and wraps the PNG - it exists so
  * the still and the animation cannot disagree; a hand-drawn SVG was tried and drifted from the card
@@ -28,10 +28,15 @@ const [url, out, framesArg, widthArg, delayArg] = process.argv.slice(2);
 const WIDTH = Number(widthArg) || 320;
 const DELAY = Number(delayArg) || 90;
 const IS_SVG = /\.svg$/i.test(out ?? '');
-const FRAMES = IS_SVG ? 1 : Number(framesArg) || 24;
+// PNG is the SVG's own still, unwrapped: same single shot, same downscale, just written straight
+// out instead of base64'd into an <svg>. It exists for link previews - Open Graph scrapers reject
+// SVG outright and only some of them animate a GIF, so a share card needs a plain raster.
+const IS_PNG = /\.png$/i.test(out ?? '');
+const STILL = IS_SVG || IS_PNG;
+const FRAMES = STILL ? 1 : Number(framesArg) || 24;
 
 if (!url || !out) {
-    console.error('usage: capture-card.mjs <url> <out.gif|out.svg> [frames] [width] [delayMs]');
+    console.error('usage: capture-card.mjs <url> <out.gif|out.svg|out.png> [frames] [width] [delayMs]');
     process.exit(2);
 }
 
@@ -118,7 +123,7 @@ try {
     // ON the card, which is what lights the foil (`--card-opacity` 1; measured mean |delta| ~31/255
     // against the untouched card). It is also exactly GIF frame 6, so the two cannot disagree.
     for (let i = 0; i < FRAMES; i++) {
-        const t = (IS_SVG ? 0.25 : i / FRAMES) * Math.PI * 2;
+        const t = (STILL ? 0.25 : i / FRAMES) * Math.PI * 2;
         const px = box.x + box.width * (0.5 + 0.3 * Math.cos(t));
         const py = box.y + box.height * (0.5 + 0.3 * Math.sin(t * 2));
 
@@ -137,11 +142,20 @@ try {
     const w = Math.floor(src.width / scale);
     const h = Math.floor(src.height / scale);
 
-    const bytes = IS_SVG ? svg(shots[0], scale, w, h) : gif(shots, scale, w, h);
+    const bytes = IS_PNG ? png(shots[0], scale, w, h) : IS_SVG ? svg(shots[0], scale, w, h) : gif(shots, scale, w, h);
     writeFileSync(out, bytes);
-    console.log(JSON.stringify({ format: IS_SVG ? 'svg' : 'gif', frames: FRAMES, width: w, height: h, bytes: bytes.length }));
+    console.log(JSON.stringify({ format: IS_PNG ? 'png' : IS_SVG ? 'svg' : 'gif', frames: FRAMES, width: w, height: h, bytes: bytes.length }));
 } finally {
     await browser.close();
+}
+
+/** The still as a bare PNG at output size - what svg() wraps, minus the wrapper. */
+function png(shot, scale, w, h) {
+    const src = PNG.sync.read(Buffer.from(shot));
+    const flat = new PNG({ width: w, height: h });
+    flat.data = Buffer.from(downscale(src, scale, w, h, true));
+
+    return PNG.sync.write(flat);
 }
 
 /** The still, as a PNG re-encoded at output size and wrapped in an SVG the README can embed. */

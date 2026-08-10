@@ -118,7 +118,9 @@ class DashboardController extends Controller
                 'card' => "Daily limit reached - {$quota->limit()} card generations per day. Resets {$resets}.",
             ]);
         }
-        $quota->hit();
+        // Spends the free welcome generation if this identity still has one, otherwise the daily
+        // pot. Either way it is spent before the AI call, so a press that reaches the model counts.
+        $quota->spend();
 
         [$gh, $err] = $svc->ghGet('https://api.github.com/users/'.rawurlencode($login));
         if ($err !== null || ! is_array($gh)) {
