@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+    <!-- Solid, not the hairline mark the app UI uses: at 16px a 4px stroke on a 64 grid is a
+         smudge. Classic red/white reads as "pokeball" at tab size, which is the whole job. -->
+    <circle cx="32" cy="32" r="30" fill="#fff" stroke="#1b1b18" stroke-width="4" />
+    <path d="M2 32a30 30 0 0 1 60 0Z" fill="#ee2b3b" stroke="#1b1b18" stroke-width="4" stroke-linejoin="round" />
+    <path d="M2 32h60" stroke="#1b1b18" stroke-width="6" />
+    <circle cx="32" cy="32" r="11" fill="#fff" stroke="#1b1b18" stroke-width="6" />
+</svg>

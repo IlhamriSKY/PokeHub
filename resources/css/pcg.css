@@ -1,0 +1,1762 @@
+/* =========================================================
+   Poke Card Generator authentic faces - real WebP frame assets
+   (downloaded from pokecardgenerator.com) with GitHub + AI content
+   overlaid. Fonts are the real Gill Sans / NeoGram / TCG-symbol set.
+   ========================================================= */
+
+@font-face {
+    font-family: 'PCG';
+    src: url('/fonts/pcg/GillSansStd.otf') format('opentype');
+    font-weight: 400;
+    font-display: swap;
+}
+@font-face {
+    font-family: 'PCG';
+    src: url('/fonts/pcg/GillSansStdBold.otf') format('opentype');
+    font-weight: 700;
+    font-display: swap;
+}
+@font-face {
+    font-family: 'PCG Cond';
+    src: url('/fonts/pcg/GillSansStd-BoldCondensed.otf') format('opentype');
+    font-weight: 700;
+    font-display: swap;
+}
+@font-face {
+    font-family: 'PCG Nova';
+    src: url('/fonts/pcg/GillSansNova-Medium.ttf') format('truetype');
+    font-weight: 500;
+    font-display: swap;
+}
+@font-face {
+    font-family: 'PCG Num';
+    src: url('/fonts/pcg/NeoGramTrial-Heavyit.otf') format('opentype');
+    font-display: swap;
+}
+
+/* The face fills the card; the frame WebP is the whole card artwork. */
+.pcg {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    container-type: inline-size;
+    overflow: hidden;
+    border-radius: inherit;
+    font-family: 'PCG', 'Cabin', sans-serif;
+    color: #1b1b1b;
+    /* The face must not inherit alignment from whatever wraps it. Wrapping a card in a <button>
+       (the landing page does, to make it zoomable) applies the UA default `text-align: center`,
+       which cascaded into every text node - attack names and descriptions drifted to the middle of
+       their grid column, while the same card inside a <div> rendered correctly. Elements that
+       genuinely are centred (species, flavor) set it themselves. */
+    text-align: start;
+}
+.pcg-frame {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: fill;
+    pointer-events: none;
+}
+/* dual type: the secondary frame revealed on the bottom-right diagonal half */
+.pcg-frame2 {
+    -webkit-mask-image: linear-gradient(135deg, transparent 0 45%, #000 55% 100%);
+    mask-image: linear-gradient(135deg, transparent 0 45%, #000 55% 100%);
+}
+/* frame-style finish overlay (DB frame asset): a transparent-centre border. It
+   must paint ABOVE the base type frame (replacing its border) but BEHIND the text
+   content - so NO z-index; it keeps DOM order (after the frames, before content). */
+.pcg-frame-overlay {
+    z-index: auto;
+}
+/* visual-effect overlay (DB effect asset) - sits over the art, under the text */
+.pcg-effect {
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: fill;
+    pointer-events: none;
+    mix-blend-mode: screen;
+}
+.pcg > *,
+.pcg-head > * {
+    position: absolute;
+}
+/* name/HP wrapper. Transparent by default (display:contents) so every gen that has
+   NOT opted into a shared header row keeps positioning .pcg-name / .pcg-topright
+   against .pcg exactly as before. */
+.pcg-head {
+    display: contents;
+}
+
+/* ---- shared content atoms (positions come from the per-gen blocks) ---- */
+.pcg-photo {
+    object-fit: cover;
+}
+.pcg-emblem {
+    display: inline-block;
+    width: auto;
+    aspect-ratio: 1;
+    object-fit: contain;
+    vertical-align: middle;
+}
+.pcg-topright {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+}
+.pcg-hp {
+    display: flex;
+    align-items: baseline;
+    gap: 0.2em;
+    white-space: nowrap;
+}
+.pcg-hp small {
+    font-size: 0.5em;
+    font-weight: 700;
+}
+.pcg-hp b {
+    font-family: 'PCG Num', serif;
+    font-style: italic;
+}
+.pcg-name {
+    font-family: 'PCG Cond', 'PCG', sans-serif;
+    font-weight: 700;
+    display: flex;
+    align-items: flex-end;
+    gap: 1cqw;
+}
+.pcg-name-txt {
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.pcg-name-emblem {
+    width: 11cqw;
+    height: auto;
+    flex: none;
+    object-fit: contain;
+    align-self: center;
+}
+.pcg-stage {
+    font-family: 'PCG Cond', sans-serif;
+    font-weight: 700;
+    text-transform: uppercase;
+    line-height: 1;
+}
+.pcg-species {
+    text-align: center;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-weight: 700;
+}
+.pcg-atk {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    align-items: center;
+    column-gap: 0.4em;
+}
+.pcg-cost {
+    display: inline-flex;
+    gap: 0.4cqw;
+    align-items: center;
+}
+.pcg-atkname {
+    font-weight: 700;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.pcg-dmg {
+    font-family: 'PCG Num', serif;
+    font-style: italic;
+    font-weight: 700;
+    white-space: nowrap;
+}
+.pcg-atkdesc {
+    grid-column: 1 / -1;
+    line-height: 1.15;
+    font-weight: 400;
+}
+/* The flavour box is the one text slot with a HARD painted boundary - the frame art draws a
+   rule above and below it - so it is the one slot that visibly breaks when the text is a line
+   too long. The character clamps in GithubCardService are a budget, not a guarantee: character
+   count is a poor proxy for rendered width, and a 103-character sentence of wide glyphs still
+   spilled past the rule. Clamp by LINES, which is what the box is actually measured in.
+   `--flavor-lines` is per generation: 1-gen's printed box takes exactly two. */
+.pcg-flavor {
+    font-style: italic;
+    line-height: 1.15;
+    text-align: center;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: var(--flavor-lines, 2);
+    overflow: hidden;
+}
+.pcg-wrr {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    align-items: center;
+}
+.pcg-wrr > span {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.15em;
+}
+.pcg-evolve {
+    display: flex;
+    align-items: center;
+    gap: 0.3em;
+    background: rgba(250, 247, 238, 0.94);
+    border-radius: 999px;
+    box-shadow:
+        0 1px 3px rgba(0, 0, 0, 0.4),
+        inset 0 0 0 1px rgba(0, 0, 0, 0.15);
+}
+.pcg-evolve img {
+    border-radius: 50%;
+    object-fit: cover;
+}
+.pcg-evolve span {
+    display: flex;
+    flex-direction: column;
+    line-height: 1.05;
+}
+.pcg-evolve em {
+    font-style: normal;
+    font-weight: 700;
+    text-transform: uppercase;
+}
+.pcg-evolve b {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* =========================================================
+   1st GEN (classic WOTC Base Set). Window is TRANSPARENT - the
+   avatar sits BEHIND the frame. Window measured from the 500x700
+   art: left 12% top 12.6% width 75.6% height 38.6% (bottom 51.2%).
+   ========================================================= */
+.pcg.gen-1-gen {
+    color: #171717;
+}
+.gen-1-gen .pcg-photo {
+    /* bleed ~1% past the transparent window (L11.80 T12.71 R87.80 B51.29) so the
+       photo tucks under the frame bevel on every side - no dark gap on R/B. */
+    left: 10.8%;
+    top: 11.7%;
+    width: 78%;
+    height: 40.6%;
+}
+/* stage label sits just above the name (small gap), like the reference's "1231"/ILHAM. */
+.gen-1-gen .pcg-stage {
+    left: 9.8%;
+    top: 4.6%;
+    font-size: 2.9cqw;
+    color: #2a2a2a;
+}
+/* Name + HP are ONE baseline-aligned row, so the HP number always sits on the name's
+   baseline. They used to be anchored separately, which could only ever be right for one
+   variant: Stage moves the name down (7.4% vs 6.6%) and shrinks it (5.1 vs 5.4cqw), so a
+   fixed HP top read 0.56% high there. Sharing a row also makes the name responsive - it
+   takes whatever width the HP leaves and ellipses past it, instead of a guessed max-width.
+
+   `top` is the one calibration knob: the row's baseline lands 4.40% of card height below
+   it, because the HP's 'PCG Num' line box (1.5x its font-size) drives the row's ascent.
+   So top = wanted-baseline - 4.40%. Measured on the live DOM with a zero-height
+   inline-block strut (its bottom edge IS the baseline) and the card rotation flattened -
+   element rects lie here, PCG Num's em box is 1.5x its font size. */
+.gen-1-gen .pcg-head {
+    display: flex;
+    align-items: baseline;
+    /* the ONLY guaranteed gap between an ellipsed name and the HP number. 1.2cqw keeps
+       Stage's name room at 30.8% - a hair above the 30.6% max-width it had before, so
+       the default "Linus Torvalds" still fits unclipped. */
+    gap: 1.2cqw;
+    left: 9.8%;
+    /* Both measured on the reference: its HP ink ends at 82.17% (we stopped at 78% - an old,
+       deliberately conservative choice to clear the baked emblem, which actually starts ~87%), and
+       its name baseline is 10.50%. Ours sat at 9.852%. Crucially the reference uses the SAME
+       baseline for Basic AND Stage - only the left anchor moves - so is-stage no longer needs its
+       own `top` at all. */
+    right: 17.83%;
+    top: 6.098%;
+}
+.gen-1-gen .pcg-head > * {
+    position: static;
+}
+.gen-1-gen .pcg-name {
+    flex: 1;
+    min-width: 0;
+    font-size: 5.4cqw;
+    line-height: 1;
+    color: #1a1a1a;
+    text-shadow: 0 1px 0 rgba(255, 255, 255, 0.35);
+}
+/* name icon (ex/gx/v...) - small so name+icon never reach the HP number. */
+.gen-1-gen .pcg-name-emblem {
+    width: 6.2cqw;
+}
+/* HP sits LEFT of the frame's baked type emblem; the row above puts it on the name's
+   baseline, so it only needs to keep its own width here. */
+.gen-1-gen .pcg-topright {
+    flex: none;
+    gap: 1.2cqw;
+}
+/* 1st-gen HP "312k HP": number matched to the name size, both dark red. */
+.gen-1-gen .pcg-hp {
+    font-size: 5.4cqw;
+    gap: 0.22em;
+    font-weight: 800;
+}
+.gen-1-gen .pcg-hp small {
+    color: #c0211f;
+    font-size: 0.66em;
+    font-weight: 700;
+}
+.gen-1-gen .pcg-hp b {
+    color: #c0211f;
+}
+.gen-1-gen .pcg-topright .pcg-emblem {
+    height: 7.4cqw;
+}
+/* 1st-gen attack energy cost stacks in a 2-column grid (like Base Set / pokecardgenerator):
+   1-2 energies -> one row, 4 -> 2x2, and 3 -> a TRIANGLE (2 on top, 3rd centred below). */
+.gen-1-gen .pcg-cost {
+    display: grid;
+    grid-template-columns: repeat(2, auto);
+    gap: 0.25cqw;
+    align-content: center;
+    justify-content: start;
+}
+/* 3-energy cost = triangle: the 3rd pip spans both columns and centres under the top pair. */
+.gen-1-gen .pcg-cost .pcg-emblem:nth-child(3):last-child {
+    grid-column: 1 / 3;
+    justify-self: center;
+}
+.gen-1-gen .pcg-cost .pcg-emblem {
+    height: 4.4cqw;
+}
+.gen-1-gen .pcg-wrr .pcg-emblem {
+    height: 4.4cqw;
+}
+/* species/dex line sits ON the baked gold bar (~54%), centred + italic, like
+   pokecardgenerator's "111. Length: 222, Weight: 111 lbs." */
+.gen-1-gen .pcg-species {
+    /* vertically centred in the baked gold bar (53.71%-56.43%) via flex, so the
+       dex line sits mid-band instead of hugging the bottom edge. Nudged down from
+       53.71% to sit lower in the gold badge (the line read a touch high). */
+    left: 15%;
+    top: 54.3%;
+    width: 70%;
+    height: 2.72%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2.5cqw;
+    font-style: italic;
+    color: #3a2c0a;
+    letter-spacing: 0.02em;
+}
+/* Attacks fill the open cream area BETWEEN the dex line and the baked divider
+   line (~82%), like pokecardgenerator: attack 1 ~59-66%, attack 2 ~73-80%. */
+.gen-1-gen .pcg-attacks {
+    left: 9%;
+    top: 59%;
+    width: 82%;
+    height: 21%;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    gap: 1.2cqw;
+}
+/* second attack gets the thin Base Set separator line above it */
+.gen-1-gen .pcg-atk + .pcg-atk {
+    border-top: 0.3cqw solid rgba(35, 25, 10, 0.35);
+    padding-top: 1.4cqw;
+}
+.gen-1-gen .pcg-attacks .pcg-atkname {
+    font-size: 4cqw;
+    color: #171717;
+}
+.gen-1-gen .pcg-attacks .pcg-dmg {
+    font-size: 4.8cqw;
+    color: #171717;
+}
+.gen-1-gen .pcg-attacks .pcg-atkdesc {
+    font-size: 2.5cqw;
+    line-height: 1.1;
+    color: #2b2b2b;
+    margin-top: 0.12em;
+}
+/* W/R/R = compact single row of emblems + amounts (no labels), under the divider. */
+.gen-1-gen .pcg-wrr {
+    left: 8%;
+    top: 84%;
+    width: 84%;
+    height: 3.4%;
+    font-size: 2.8cqw;
+    color: #222;
+}
+/* Traced down the middle 70% of normal-basic.webp: the printed box's rules sit at y88.71-89.14%
+   and y94.00-94.43%, so its interior is 89.14-94.00% - 4.86% of card height. Two lines at
+   2.3cqw x 1.15 line-height are 5.29cqw = 3.78% of height, so centring them in that interior
+   puts the top at 91.57 - 1.89 = 89.68%. It was 90.3%, which left room for 1.96 lines: one line
+   was fine, two crossed the bottom rule by a hair, and that is exactly what was showing. */
+.gen-1-gen .pcg-flavor {
+    left: 9%;
+    top: 89.68%;
+    width: 82%;
+    font-size: 2.3cqw;
+    color: #333;
+}
+.gen-1-gen .pcg-evolve {
+    left: 3%;
+    top: 12.6%;
+    padding: 0.12em 0.5em 0.12em 0.16em;
+    z-index: 3;
+}
+.gen-1-gen .pcg-evolve img {
+    width: 5.4cqw;
+    height: 5.4cqw;
+    box-shadow: inset 0 0 0 1.5px #d8cba8;
+}
+.gen-1-gen .pcg-evolve em {
+    font-size: 2.2cqw;
+    color: #6a5d3c;
+}
+.gen-1-gen .pcg-evolve b {
+    font-size: 3cqw;
+    max-width: 20cqw;
+    color: #1f1b12;
+}
+/* Stage 1 / Stage 2 (1st gen): the `<type>-stage.webp` frame BAKES the gold sunburst
+   pre-evolution box and the "evolves from" rule into the header, so the DOM only fills them
+   in -- the thumbnail drops into the baked placeholder and the prefix+name sit on the rule.
+   All values measured off pokecardgenerator's own Stage 1 render (canvas-sampled) and its
+   frame art: placeholder L8.8% T7.86% W11.8% H7.29%, rule at 6.57%, "Evolves from X" 4.86%,
+   name 27.4%/7.48%. The stage label deliberately does NOT shift right -- the reference keeps
+   "STAGE 1" at the far left, above the sunburst, where .gen-1-gen .pcg-stage already puts it.
+
+   The name is a touch smaller than Basic's 5.4cqw because the sunburst eats 17.6% of the band
+   while the HP still starts at 59.4% (PokeHub keeps HP left of the frame's baked emblem;
+   pokecardgenerator runs it under the emblem and so has more room). At 5.4cqw the default
+   "Linus Torvalds" reached 59.55% and touched "312k HP". */
+/* Only the LEFT anchor moves on a Stage card - the reference measures its Stage name at L27.21%
+   but on the very same baseline as Basic (ink bottom 10.50% in both), so the inherited `top`
+   above is correct here and the old per-stage override is gone. */
+.gen-1-gen.is-stage .pcg-head {
+    left: 27.4%;
+}
+.gen-1-gen.is-stage .pcg-name {
+    font-size: 5.1cqw;
+}
+/* the chip loses its own pill chrome here - the frame art draws the box.
+   preserve-3d lets the thumbnail's translateZ lift it above the holo layers. */
+.gen-1-gen.is-stage .pcg-evolve {
+    inset: 0;
+    max-width: none;
+    display: block;
+    padding: 0;
+    background: none;
+    box-shadow: none;
+    pointer-events: none;
+    transform-style: preserve-3d;
+}
+/* thumbnail sits exactly on the frame's baked lavender placeholder. translateZ(2px)
+   raises it above the shine/glare foil (which live at Z<=1.41px in card__front's
+   preserve-3d space) so the auto-inserted image is never overlapped by the holo. */
+.gen-1-gen.is-stage .pcg-evolve img {
+    position: absolute;
+    left: 8.8%;
+    top: 7.86%;
+    width: 11.8%;
+    height: 7.29%;
+    border-radius: 0;
+    box-shadow: none;
+    transform: translateZ(2px);
+}
+/* "Evolves from <name>" - one italic line riding just above the baked gold rule */
+.gen-1-gen.is-stage .pcg-evolve span {
+    position: absolute;
+    left: 25.9%;
+    top: 4.5%;
+    max-width: 38%;
+    flex-direction: row;
+    align-items: baseline;
+    gap: 0.3em;
+}
+.gen-1-gen.is-stage .pcg-evolve em,
+.gen-1-gen.is-stage .pcg-evolve b {
+    font-size: 2.4cqw;
+    font-style: italic;
+    font-weight: 700;
+    text-transform: none;
+    color: #1a1a1a;
+}
+.gen-1-gen.is-stage .pcg-evolve b {
+    max-width: 26cqw;
+}
+
+/* =========================================================
+   TCG POCKET - modern silver-border frame. "BASIC" and the
+   weakness/retreat pills are baked in, so the stage label is
+   hidden. Window: left 8.4% top 9.4% width 83.4% height 37.4%.
+   ========================================================= */
+.pcg.gen-tcg-gen {
+    color: #1c1c1c;
+}
+/* The stage pill is drawn ON TOP of the type frame AND of any Frame-style overlay, for two
+   reasons: the frame BAKES the word "BASIC" (so a Stage card would still read BASIC), and a
+   Frame overlay (rainbow/holo/...) otherwise tints the baked pill. Basic gets the small blank
+   pill (basic.webp 113x44), stages get the full chrome (stage1.webp 427x129 = pill +
+   pre-evolution octagon + "evolves from" bar). We draw the label ourselves either way.
+   Geometry MEASURED by diffing pokecardgenerator's canvas Basic vs Stage 1: the chrome lands at
+   left 3.01% / top 3.84% / width 56.94% (~1:1, height MUST stay auto - aspect 3.31). Inside it:
+   pill x3.01-17.54% y3.84-8.02%, octagon x3.81-16.61% y8.04-15.95%, bar x~20-59.42%. */
+.pcg.gen-tcg-gen .pcg-stage-chrome {
+    left: 3.01%;
+    top: 3.84%;
+    width: 14.53%; /* basic.webp = the pill on its own */
+    height: auto;
+}
+/* The stage chrome layer PokeCard renders AFTER the foil. Nothing inside the face can paint
+   above the holo: `.pcg` is its own stacking context (preserve-3d), and card__front's
+   overflow:hidden flattens 3D so translateZ is ignored too - both were tried and neither worked.
+   A later sibling is the only mechanism that does. It only carries chrome, so it must not
+   capture pointer events or paint a background. */
+.pcg-chrome-layer {
+    background: none;
+    pointer-events: none;
+    /* Being a later sibling is not enough on its own: `.card__shine` carries z-index:3, which
+       paints above any later sibling left at z-index:auto. Must out-rank every foil layer. */
+    z-index: 10;
+}
+.gen-tcg-gen.is-stage .pcg-stage-chrome {
+    width: 56.94%; /* stage1.webp = pill + octagon + bar */
+}
+/* ...but the bar is the plate the "Evolves from X" line sits on, and with no pre-evolution
+   named it renders as an empty grey stub under the name - which is EVERY Stage card that has
+   not filled the field in. Clip the asset rather than narrowing it: `width` would rescale the
+   pill and octagon too.
+
+   Cut traced off stage1.webp itself (427x129) by counting solid pixels per column: the octagon
+   and its silver rim run to x99 (87-122 solid rows), then the bar's tall left cap sits at
+   x100-105 (~50 rows) before settling into its steady 24-row band from x106 rightwards. So the
+   boundary is x100 = 23.42% across the asset; the earlier guess of "the bar starts at card
+   x~20%" cut at x114 and left the cap showing as a grey nub beside the octagon. */
+.gen-tcg-gen.is-stage.no-evo .pcg-stage-chrome {
+    clip-path: inset(0 76.58% 0 0);
+}
+/* The label centres on the PILL the chrome draws, not on the chrome asset's box: basic.webp
+   is 113x44 but its pill only occupies x0-106 y0-37 (6px of transparent padding on the right
+   and bottom), so centring on the box pushed the text right and down. Target traced off the
+   frame's own baked "BASIC" glyphs (basic-steel.webp 501x700): ink x28-71 y35-43, i.e. centre
+   x9.88% y5.57% - and the blank pill lands centre x9.89%, so the two agree.
+   width 13.76% = the 107px pill at basic.webp's scale (14.53% / 113px) -> box centre 9.89%. */
+.gen-tcg-gen .pcg-stage {
+    display: block;
+    left: 3.01%;
+    top: 4.78%;
+    width: 13.76%;
+    text-align: center;
+    font-size: 2.5cqw;
+    font-style: italic;
+    color: #4a4a4a;
+}
+/* stage1.webp draws the SAME 107px pill at a different scale (56.94% / 427px, vs basic's
+   14.53% / 113px), so on a Stage card it renders 14.27% wide -> centre 10.14%. One shared
+   width cannot centre in both; without this override the label reads right of centre. */
+.gen-tcg-gen.is-stage .pcg-stage {
+    width: 14.27%;
+}
+/* pre-evolution thumbnail drops into the chrome's octagon; prefix+name ride the bar */
+.gen-tcg-gen.is-stage .pcg-evolve {
+    inset: 0;
+    max-width: none;
+    display: block;
+    padding: 0;
+    background: none;
+    box-shadow: none;
+    pointer-events: none;
+}
+/* Pre-evolution photo. The chrome is the ORIGINAL pokecardgenerator stage1/stage2.webp, whose
+   octagon well is an OPAQUE pearl placeholder -- so PokeCard paints this photo ON TOP of the chrome
+   and marking.png masks it to the octagon (covering the pearl; the chrome's silver rim frames it).
+   (We previously hole-punched a stage1-window.webp and put the photo behind it, but the user asked
+   to use the original assets.) marking.png = the SAME 427x129 canvas as the chrome: a solid octagon
+   over the well only (opaque pixels asset x12-93 y35-117, else alpha 0), so the mask matches the rim. */
+.gen-tcg-gen.is-stage .pcg-evolve-photo {
+    position: absolute;
+    /* Box = marking.png's octagon bbox (asset x12-93 y35-117 -> L4.61% T7.19% W10.80% H7.85%), so the
+       masked octagon lands exactly on the chrome's pearl octagon. */
+    left: 4.61%;
+    top: 7.19%;
+    width: 10.8%;
+    height: 7.85%;
+    /* Zoom marking.png's octagon (asset x12-93 y35-117 of 427x129) to fill this box:
+       mask-size = 427/81 x 129/82 = 527.2% x 157.3%; mask-position maps asset x12->0 (3.47%)
+       and y35->0 (74.46%). The silver octagon (stage1-window.webp) frames the masked edge. */
+    -webkit-mask-image: url('/img/pcg/tcg-gen/marking.png');
+    mask-image: url('/img/pcg/tcg-gen/marking.png');
+    -webkit-mask-repeat: no-repeat;
+    mask-repeat: no-repeat;
+    -webkit-mask-size: 527.2% 157.3%;
+    mask-size: 527.2% 157.3%;
+    -webkit-mask-position: 3.47% 74.46%;
+    mask-position: 3.47% 74.46%;
+    /* Fit the WHOLE portrait into the well: `cover` fills the octagon with minimal crop, the way
+       the reference shows the pre-evolution art. The old 150% zoom cropped tight to the face
+       (hair + shoulders cut off), which read as messy in a small octagon. The octagon bbox is
+       near-square (~54x53 on the 501x700 frame), so a square avatar covers it almost 1:1. */
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+}
+.gen-tcg-gen.is-stage .pcg-evolve span {
+    position: absolute;
+    left: 21.5%;
+    /* Vertically CENTRED on the chrome's "evolves from" bar. Bar = asset y50-76 -> card
+       y8.61-11.18%, centre 9.89%. Measured line box is 1.72% tall, so top = 9.89 - 0.86 = 9.03%
+       lands it dead centre. It used to sit at 8.7% and read high. */
+    top: 9.03%;
+    max-width: 37%;
+    flex-direction: row;
+    align-items: baseline;
+    gap: 0.3em;
+}
+.gen-tcg-gen.is-stage .pcg-evolve em,
+.gen-tcg-gen.is-stage .pcg-evolve b {
+    font-size: 2.3cqw;
+    font-style: italic;
+    font-weight: 700;
+    text-transform: none;
+    color: #2a2a2a;
+}
+/* Dual type split - MEASURED off pokecardgenerator's own canvas (fire+water, FX cleared), not
+   eyeballed. Sampling the fire->water boundary every 3% of height gave a dead-straight line:
+   (y53%,x54.47%) -> (y65%,x45.53%) -> (y80%,x34.29%) -> (y95%,x23.34%).
+   With H = W/0.715 = 1.3986W, the boundary direction is (-0.3113, +0.5874); its normal (pointing
+   into the secondary) is (0.8836, 0.4683) => CSS angle atan2(dx,-dy) = 117.9deg ~ 118deg.
+   Stop f = (0.8829x + 0.4695y)/L with L = 0.8829 + 1.3986*0.4695 = 1.5395  =>  f = 0.538 at all
+   three probe points. Edge is HARD. The old 135deg/68% (and the shared 45/55) were wrong in BOTH
+   angle and offset. Scoped to tcg - 1-gen keeps its own split. */
+.gen-tcg-gen .pcg-frame2 {
+    -webkit-mask-image: linear-gradient(118deg, transparent 0 53.8%, #000 53.8%);
+    mask-image: linear-gradient(118deg, transparent 0 53.8%, #000 53.8%);
+}
+.gen-tcg-gen .pcg-photo {
+    /* Bleed ~0.3% past the frame's transparent window (measured off basic-*.webp 501x700:
+       L8.18 T9.57 R91.82 B47) so the photo tucks under the bevel on every side. The old
+       8.4/9.4/83.4/37.4 left a bare strip at the LEFT and BOTTOM of the window. */
+    left: 7.6%;
+    top: 9.15%;
+    width: 84.8%;
+    height: 38.3%;
+}
+/* Name + HP share one baseline-aligned row, same mechanism as 1-gen (see .gen-1-gen .pcg-head).
+   They used to be anchored independently with the name capped at a guessed max-width:46%, which
+   could only be right for one variant: `has-dual` pulls the HP left to 80.7% but the name still
+   ran to 65%, so a long name closed to 0.39% of the HP (vs 5.69% on a single type). In the row
+   the name simply takes what the HP leaves, whatever moved it.
+   `top` needs no new calibration here - measured, 3.9% puts the row's baseline at 7.745%, exactly
+   where the two separately-anchored elements already sat. */
+.gen-tcg-gen .pcg-head {
+    display: flex;
+    align-items: baseline;
+    gap: 1.2cqw;
+    left: 19%;
+    right: 14%; /* baked type disc starts 87.1% -> HP must end by ~86% */
+    /* 3.635%, not 3.9%: measured against pokecardgenerator by blanking the name field, snapping
+       its canvas, refilling with capitals and diffing - upstream's name ink runs T4.20-B7.48%, and
+       with no descenders that ink bottom IS the baseline. Ours sat at 7.745%, i.e. 0.265% low. */
+    top: 3.635%;
+}
+.gen-tcg-gen .pcg-head > * {
+    position: static;
+}
+.gen-tcg-gen .pcg-name {
+    flex: 1;
+    min-width: 0;
+    font-size: 5cqw;
+    font-family: 'PCG', sans-serif;
+    color: #1c1c1c;
+    text-shadow: 0 1px 0 rgba(255, 255, 255, 0.4);
+}
+/* The type badge is BAKED into the frame at ~L88.4-94.8%, and (unlike before) we no longer
+   overlay an emblem here - so the HP has to stop short of it or "312k" runs into the disc.
+   With a dual type the two overlay badges start further left (primary at ~83.8%), so the HP
+   pulls back again. */
+.gen-tcg-gen .pcg-topright {
+    flex: none;
+    gap: 1.2cqw;
+}
+.gen-tcg-gen.has-dual .pcg-head {
+    right: 19.3%; /* the enlarged pair starts at 81.95%, so HP ends at 80.7% */
+}
+.gen-tcg-gen .pcg-hp {
+    font-size: 4.8cqw;
+}
+.gen-tcg-gen .pcg-hp small {
+    color: #b01b1b;
+}
+.gen-tcg-gen .pcg-topright .pcg-emblem {
+    height: 7cqw;
+}
+/* Dual type on tcg: the frame BAKES the primary badge (see `bakedPrimary` in PcgFace), so a
+   single type draws NO overlay at all - overlaying it produced a second disc peeking out from
+   behind. For dual we overlay BOTH, exactly like 1-gen: secondary at the edge, centred on the
+   baked badge (measured ~L88.4% T4.1% W6.4%) so it fully covers it, primary in front and a bit
+   left. That reproduces pokecardgenerator's stacked pair. */
+/* Baked badge MEASURED off basic-steel.webp with a % grid drawn over the crop:
+   x87.1-93.6%, y2.77-7.5% - i.e. a true circle 6.5% of card WIDTH across. BOTH frames bake one
+   (frame2 shows through in this corner too), and they sit at the same spot, so one overlay hides
+   both. The old top:3.97%/right:5% left the baked disc peeking out top-LEFT (the grey crescent).
+   Overlay is 7.4cqw so it over-covers slightly, centred on the baked disc (cx90.35% cy5.14%). */
+/* Site diff (header band only) puts the dual pair at roughly y3-10% of the card, i.e. ~7% of
+   card HEIGHT tall = ~10cqw - bigger and LOWER than what we had (top 2.21%, 8.2cqw). Growing it
+   is what lets the pair drop without re-exposing the baked disc (y2.77-7.5%): at top 2.7% +
+   10cqw the overlay spans 2.7-9.85% and still swallows it. Centred on the disc at cx90.35%. */
+/* Sized to MATCH the baked disc (x87.1-93.6% = 6.5% of card width, y2.77-7.5%) rather than
+   over-cover it: 6.9cqw leaves just ~0.2% margin all round, so the overlaid badges read the same
+   size as the frame's own. */
+/* Identical box to the single-type `.pcg-tcg-emblem` above - same 6.9cqw, same top, and the
+   SECONDARY sits at exactly the single disc's position, with the primary stacked in front of it.
+   These were 8cqw at top 2.7%, grown to be sure of swallowing a baked disc under them; sampling
+   all twelve frames showed only basic-steel.webp has one, and 6.9cqw already covers it (spans
+   x86.90-93.80% / y2.68-7.60% against the baked box's x87.1-93.6% / y2.77-7.5%). The extra 1.1cqw
+   bought nothing and made a dual card's badges visibly fatter than a single card's. */
+.gen-tcg-gen .pcg-dual-sec,
+.gen-tcg-gen .pcg-dual-pri {
+    top: 2.68%;
+    height: 6.9cqw;
+}
+.gen-tcg-gen .pcg-dual-sec {
+    right: 6.2%; /* spans 86.90-93.80%, i.e. the single-type disc's own box */
+    z-index: 2;
+}
+.gen-tcg-gen .pcg-dual-pri {
+    /* offset 0.55x the badge -> ~45% overlap, matching the reference stack. Scaled with the badge:
+       0.55 x 6.9 = 3.8%, so 6.2 + 3.8. Leaving this at the old 10.05% would have widened the gap
+       to 0.56x of a now-smaller badge and read as two separate discs rather than a stack. */
+    right: 10%;
+    z-index: 3;
+}
+.gen-tcg-gen .pcg-cost .pcg-emblem {
+    height: 4.2cqw;
+}
+/* The pill's bright interior is y86.0-89.14% (3.14% tall). At 4.2cqw the emblem rendered 3.01%
+   tall - 96% of that - so it touched top and bottom and read as "not centred" even though the
+   flex box WAS centred. 3.1cqw leaves ~0.45% of breathing room above and below. */
+.gen-tcg-gen .pcg-wrr .pcg-emblem {
+    height: 3.1cqw;
+}
+/* Sits on the frame's baked dex strip (measured y47.9-49.8%). */
+/* Vertically centred in the frame's dex bar. Traced basic-steel.webp down x=250: bright top
+   lip y330-333, dark top rule y334-335, bar interior y336-352, dark bottom rule y353-354 ->
+   interior centre y344 = 49.14%. The line's ink box measured 48.23-50.61% (centre 49.42%), so
+   it sat ~0.3% low and hugged the bottom rule; top 47.67% lands the ink centre on 49.15%. */
+/* Stays at 47.67% - the value the bar-interior trace above produced.
+   I briefly moved this to 47.32% by centring on the reference's dex INK BAND (48.43-49.61%). That
+   was wrong twice over: the band was measured from a different generation's render, and more
+   importantly this box is display:BLOCK, so its single line sits at the TOP of the 3.4% box with
+   dead space beneath. Centring the BOX therefore does not centre the INK, and the line visibly
+   rode high on the strip. Judge this one by the ink, not the box. */
+.gen-tcg-gen .pcg-species {
+    left: 10%;
+    top: 47.67%;
+    width: 80%;
+    height: 3.4%;
+    font-size: 2.8cqw;
+    color: #333;
+}
+.gen-tcg-gen .pcg-attacks {
+    left: 8%;
+    top: 52%;
+    width: 84%;
+    display: flex;
+    flex-direction: column;
+    gap: 0.9cqw;
+}
+.gen-tcg-gen .pcg-attacks .pcg-atkname {
+    font-size: 4cqw;
+}
+.gen-tcg-gen .pcg-attacks .pcg-dmg {
+    font-size: 4.6cqw;
+}
+.gen-tcg-gen .pcg-attacks .pcg-atkdesc {
+    font-size: 2.5cqw;
+    line-height: 1.12;
+    color: #2b2b2b;
+    margin-top: 0.1em;
+}
+/* No painted box here - the limit is the weakness pill, whose bright interior starts at y86.0%.
+   79% to 86% is 7% of height; a line is 2.3cqw x 1.12 = 1.84% of height, so three fit. */
+.gen-tcg-gen .pcg-flavor {
+    left: 8%;
+    top: 79%;
+    width: 84%;
+    font-size: 2.3cqw;
+    line-height: 1.12;
+    color: #333;
+    --flavor-lines: 3;
+}
+/* "ex rule" band - takes the flavor slot (PcgFace renders one or the other, never both).
+   Asset is 493x67 (aspect 7.36) so height MUST stay auto, or it stretches to the box. */
+.gen-tcg-gen .pcg-rule {
+    left: 8%;
+    top: 79%;
+    width: 84%;
+    height: auto;
+}
+/* Weakness / retreat sit INSIDE the frame's two baked pills. Measured off basic-*.webp AND
+   cross-checked against pokecardgenerator's own canvas (they agree):
+     weakness pill x7.39-48.1%, retreat pill x51.9-92.61%, both y86-89.29%.
+   The words "weakness"/"retreat" are baked too (weakness ink x14.57-23.55%, retreat x57.49-64.07%),
+   so our emblem+amount must clear them: centring the content in the post-word space puts it at
+   ~68.4% across each column, i.e. padding-left 36.8% then centre. Was left:9%/top:87%/h:4.4%,
+   which sat too low and overflowed the pills. */
+.gen-tcg-gen .pcg-wrr {
+    left: 7.39%;
+    top: 86%;
+    width: 85.22%;
+    height: 3.14%; /* the pill's bright interior, so vertical centring lands on it exactly */
+    font-size: 2.8cqw;
+}
+/* Read left-to-right after the baked word, like a real card ("weakness [type] x2"), rather than
+   centred in the whole pill. 42.5% of the column starts the content at ~25.5% / ~68.1%, clearing
+   the baked ink which ends at 23.55% and 64.07%. */
+.gen-tcg-gen .pcg-wrr > span {
+    padding-left: 33%;
+    justify-content: center;
+}
+/* Weakness amount ("x2") - big and bold, matching pokecardgenerator's prominent amount (its "x3"
+   reads about pill-height and heavy). The default 2.8cqw wrr text was too small/thin next to the
+   emblem. Scoped to the amount only, so the retreat emblem spacing (the wrr `gap`) is untouched. */
+.gen-tcg-gen .pcg-wk-amt {
+    font-size: 3.8cqw;
+    font-weight: 700;
+}
+.gen-tcg-gen .pcg-evolve {
+    left: 3%;
+    top: 9.4%;
+    padding: 0.12em 0.5em 0.12em 0.16em;
+    z-index: 3;
+}
+.gen-tcg-gen .pcg-evolve img {
+    width: 5.4cqw;
+    height: 5.4cqw;
+}
+.gen-tcg-gen .pcg-evolve em {
+    font-size: 2.2cqw;
+    color: #6a5d3c;
+}
+.gen-tcg-gen .pcg-evolve b {
+    font-size: 3cqw;
+    max-width: 20cqw;
+}
+
+/* =========================================================
+   SCARLET & VIOLET - silver border, baked "BASIC" pill, and a transparent circular SOCKET
+   top-right where the type emblem goes. The header used to claim that circle was a BAKED
+   emblem; it is a HOLE. Measured by flood-filling alpha<24 on all ten basic-*.webp (745x1040,
+   identical on every type): artwork window L8.46 T10.10 W83.89 H37.40 (fill 1.000, a rect) and
+   the socket L87.92 R4.70 T3.46 B91.25 -> cx 91.61%, cy 6.10%, 7.31% of the card wide, fill
+   0.757 ~= PI/4, i.e. a disc. Nothing draws into that hole but us.
+   ========================================================= */
+.pcg.gen-scarlet-violet {
+    color: #1c1c1c;
+}
+.gen-scarlet-violet .pcg-stage {
+    display: none;
+}
+/* Aligned to the measured window (L8.46 T10.10 R92.35 B47.50) with ~0.5% bleed on every side, so
+   the photo tucks under the frame bevel instead of leaving a bare strip - the same treatment
+   1-gen and tcg already get. The old 8/9/84/38 came from the block header's unsourced numbers. */
+.gen-scarlet-violet .pcg-photo {
+    left: 7.96%;
+    top: 9.65%;
+    width: 84.9%;
+    height: 38.3%;
+}
+/* Measured against the reference (blank the name field, refill, diff its canvas): a 2-char and an
+   8-char name both start at L19.30% and the ink bottom - the baseline, no descenders - is 7.61%.
+   Ours sat at left 17% with its baseline at 6.44%: 2.3% left and 1.17% high. Every SV value in
+   this file was unsourced; this is the first one actually measured. */
+.gen-scarlet-violet .pcg-name {
+    left: 19.2%;
+    top: 3.77%;
+    max-width: 46%;
+    font-size: 5cqw;
+    font-family: 'PCG', sans-serif;
+    color: #1c1c1c;
+    text-shadow: 0 1px 0 rgba(255, 255, 255, 0.4);
+}
+/* HP ink measured by nudging the reference's stepper and diffing: L78.68-R85.48%, T3.94-B8.27%.
+   Ours ran to 95% - 9.52% past it, hard against the card edge - and sat 0.83% high. NOTE the HP
+   here does NOT share the name's baseline (7.61 vs 8.27); that is how the reference draws SV, so
+   the two stay independently anchored rather than being folded into the shared .pcg-head row that
+   1-gen and tcg use. */
+.gen-scarlet-violet .pcg-topright {
+    right: 14.52%;
+    top: 4.43%;
+    gap: 1cqw;
+}
+.gen-scarlet-violet .pcg-hp {
+    font-size: 4.8cqw;
+}
+.gen-scarlet-violet .pcg-hp small {
+    color: #b01b1b;
+}
+/* The socket fill. 7.7cqw, not the hole's own 7.31: the reference's disc measures ~7.7% of the
+   card wide (its water glyph spans 4.58% and is 0.590 of the disc; the height check agrees at
+   7.63), which over-covers the hole's antialiased rim by ~0.2% all round - the same treatment the
+   tcg discs get. `right`/`top` are the box edges for that diameter centred on the socket:
+   right = 100 - 91.61 - 7.7/2, top = 6.10 - (7.7 * 745/1040)/2. */
+.gen-scarlet-violet .pcg-sv-emblem {
+    right: 4.54%;
+    top: 3.34%;
+    height: 7.7cqw;
+    z-index: 3;
+}
+/* Dual type: one socket, two discs - primary in front, secondary tucked behind it toward the
+   edge, exactly as 1-gen and tcg do it. Measured on the reference (SV, water + fire dual) by
+   clustering the discs' dark ink: the primary's water glyph centres at cx90.25 and sits 0.0513
+   of a diameter left of its own disc centre, so that disc is at cx90.65 - i.e. the pair shifts
+   ~1% LEFT of the single-type socket to keep the secondary on the card. The secondary is
+   occluded on its left by the primary, so it is placed off its right edge (dark ink to 97.51%,
+   +0.2% for the disc rim) -> cx 93.83%. Both keep the single disc's 7.7cqw. */
+.gen-scarlet-violet .pcg-dual-sec,
+.gen-scarlet-violet .pcg-dual-pri {
+    top: 3.41%;
+    height: 7.7cqw;
+}
+.gen-scarlet-violet .pcg-dual-sec {
+    right: 2.32%;
+    z-index: 2;
+}
+.gen-scarlet-violet .pcg-dual-pri {
+    right: 5.5%;
+    z-index: 3;
+}
+.gen-scarlet-violet .pcg-cost .pcg-emblem {
+    height: 4.2cqw;
+}
+.gen-scarlet-violet .pcg-wrr .pcg-emblem {
+    height: 4.2cqw;
+}
+/* Dex band measured on the reference: y48.16-49.21%, centre 48.69%. This box is flex-centred and
+   3.4% tall, so top 48% put its centre at 49.70% - the line rode 1.01% low. */
+.gen-scarlet-violet .pcg-species {
+    left: 10%;
+    top: 46.99%;
+    width: 80%;
+    height: 3.4%;
+    font-size: 2.8cqw;
+    color: #333;
+}
+.gen-scarlet-violet .pcg-attacks {
+    left: 8%;
+    top: 52.5%;
+    width: 84%;
+    display: flex;
+    flex-direction: column;
+    gap: 0.9cqw;
+}
+.gen-scarlet-violet .pcg-attacks .pcg-atkname {
+    font-size: 4cqw;
+}
+.gen-scarlet-violet .pcg-attacks .pcg-dmg {
+    font-size: 4.6cqw;
+}
+.gen-scarlet-violet .pcg-attacks .pcg-atkdesc {
+    font-size: 2.5cqw;
+    line-height: 1.12;
+    color: #2b2b2b;
+    margin-top: 0.1em;
+}
+.gen-scarlet-violet .pcg-flavor {
+    --flavor-lines: 3;
+    left: 8%;
+    top: 78%;
+    width: 84%;
+    font-size: 2.3cqw;
+    line-height: 1.12;
+    color: #333;
+}
+/* Centred on the gap between the frame's two footer rules. Found by averaging luminance per row
+   across the SV frame: bright cores at y85.58-85.77% and y89.33-89.42%, so the clear band between
+   them is 85.96%-89.13% (3.17% tall, centre 87.55%). The old 86.3% + 4.2% put the row's centre at
+   88.4% - 0.86% low - and ran the box to 90.5%, i.e. straight through the lower rule. The 4.2cqw
+   emblems are 3.0% of card height, so they sit inside the 3.17% band. */
+.gen-scarlet-violet .pcg-wrr {
+    left: 9%;
+    top: 85.96%;
+    width: 82%;
+    height: 3.17%;
+    font-size: 2.8cqw;
+}
+.gen-scarlet-violet .pcg-evolve {
+    left: 3%;
+    top: 9.6%;
+    padding: 0.12em 0.5em 0.12em 0.16em;
+    z-index: 3;
+}
+.gen-scarlet-violet .pcg-evolve img {
+    width: 5.4cqw;
+    height: 5.4cqw;
+}
+.gen-scarlet-violet .pcg-evolve em {
+    font-size: 2.2cqw;
+    color: #6a5d3c;
+}
+.gen-scarlet-violet .pcg-evolve b {
+    font-size: 3cqw;
+    max-width: 20cqw;
+}
+
+/* ---- image-based tag stamp + rarity pips + set badge (real WebP, no CSS shapes) ---- */
+/* Tag stamps are sized by HEIGHT, never width. The seven assets run from aspect 3.00
+   (ultra-beast, 300x100) to 6.82 (mega, 300x44 - a long thin banner, not a badge), so a
+   shared WIDTH gave every tag a DIFFERENT height: mega rendered 2.57cqw tall against
+   ~4.9-5.8cqw for the rest, i.e. half the visual weight, which is why it read as too small.
+   Driving off height gives every stamp the same weight and lets the banner-shaped ones run
+   as wide as their art wants. Each gen sets its own height below, and a single tag can be
+   nudged on its own via `.pcg-tag[data-tag='<slug>']` without disturbing the others. */
+.pcg-tag {
+    object-fit: contain;
+    /* Only bites where a gen gives the tag a fixed BOX (tcg-gen does): keeps a stamp whose
+       aspect is squarer than the box pinned to the corner instead of centred in it. A no-op
+       under height-driven sizing, where the element box IS the image. */
+    object-position: right center;
+    pointer-events: none;
+    width: auto;
+}
+.pcg-badge {
+    object-fit: contain;
+    pointer-events: none;
+}
+.pcg-rarity {
+    display: flex;
+    align-items: center;
+    gap: 0.5cqw;
+}
+/* Base Set "EDITION 1" stamp (1st gen only). Width-driven; the art is 32x24 so the height
+   follows its own aspect. Positions are per-face, in the .gen-1-gen blocks below. */
+.pcg-first-edition {
+    height: auto;
+    object-fit: contain;
+    pointer-events: none;
+    z-index: 3;
+}
+.pcg-rarity img {
+    height: 100%;
+    width: auto;
+    object-fit: contain;
+}
+/* 5.2cqw ~= the height the six badge-shaped tags already had at the old width:17.5cqw
+   (they ranged 4.90-5.83cqw), so they are unchanged to the eye; mega goes 2.57 -> 5.2cqw. */
+.gen-1-gen .pcg-tag {
+    top: 13.6%;
+    right: 13.5%;
+    height: 5.98cqw; /* 5.2 +15% */
+    z-index: 3;
+}
+/* Ultra Beast is the squarest tag (aspect 3.0), so at the shared height it reads
+   smaller than the banner-shaped tags -- bump it on its own via the data-tag hook. */
+.gen-1-gen .pcg-tag[data-tag='ultra-beast'] {
+    height: 7.5cqw;
+}
+/* Rarity pips sit bottom-RIGHT on 1st gen, not bottom-left: Base Set puts the rarity symbol
+   after the collection number, and pokecardgenerator does the same (its star measures
+   L92.28-R93.57% -- so right:6.4% lands the pips on the same edge).
+   Smaller than before (2.3cqw -> 1.8cqw): the reference symbol is only ~1.3cqw tall, and the
+   old size made a 3-pip row bulky. At 1.8cqw a pip is 2.66cqw wide (art is 65x44), so three
+   span 8.98cqw (x84.6-93.6%) and four span 12.1cqw -- both well inside the cream band.
+   bottom:3.7% is OPTICAL centring, deliberately ~0.15% below the arithmetic centre.
+   Measured on normal-basic.webp across the pip strip: the flavor box's gold rule bottoms out
+   at 94.43%, the yellow border starts at 96.43%, so the clear band is 94.57-96.43% and a
+   1.8cqw pip (1.29% of card height) box-centres at bottom:3.857%. That LOOKS too high: a
+   five-pointed star carries its mass in the upper body and tapers to two thin legs, so its
+   optical centre sits above its bounding box centre. Box-centred reads top-heavy; 3.7% puts
+   the visible mass on the band's centre line. Do NOT "correct" this back to 3.85% because the
+   numbers say centred -- the box is centred, the star is not.
+   Floor is ~3.67%: below that the box bottom passes 96.43% and the pips touch the yellow
+   border (the failure this axis has hit twice). 3.7% keeps ~0.15% (about 1px) of clearance. */
+.gen-1-gen .pcg-rarity {
+    right: 6.4%;
+    /* Nudged down from 3.7% toward the documented ~3.67% floor (below it the pips
+       touch the yellow border at 96.43%). This is already the bottom limit -- there
+       is only ~1px of room here, so the drop is deliberately small. */
+    bottom: 3.65%;
+    height: 1.8cqw;
+    z-index: 3;
+}
+/* Regular face: the stamp sits on the dex line, hard left, just under the artwork window.
+   Measured off pokecardgenerator: L6.62% T53.54% W6.43% (H then falls out at ~3.4%). */
+.gen-1-gen .pcg-first-edition {
+    left: 6.62%;
+    top: 53.54%;
+    width: 6.43%;
+}
+.gen-1-gen .pcg-badge {
+    left: 6%;
+    bottom: 1.6%;
+    width: 10cqw;
+    z-index: 3;
+}
+/* 1st-gen dual type: the base frame bakes the PRIMARY emblem near the right edge
+   (~12.5% from the right). pokecardgenerator shows dual types as two badges STACKED
+   in that corner - the primary in front, the secondary tucked behind it toward the
+   edge. We overlay BOTH badges (covering the baked one) so the pair reads
+   primary-left / secondary-right like the original, with HP just left of the pair. */
+.gen-1-gen.has-dual .pcg-head {
+    right: 23%;
+}
+/* Emblems are sized to MATCH the frame's baked badge (~6.3% of the card width) so a
+   single-type card and a dual-type card show the same emblem size. */
+.gen-1-gen .pcg-dual-sec,
+.gen-1-gen .pcg-dual-pri {
+    top: 5.7%;
+    height: 6.5cqw;
+}
+/* secondary sits at the edge, CENTRED on the frame's baked badge (~12.7% from the
+   right / ~8% from the top) so it fully covers it - no baked badge peeking through. */
+.gen-1-gen .pcg-dual-sec {
+    right: 9.4%;
+    z-index: 2;
+}
+/* primary sits in front, to the left, overlapping the secondary for the stack. */
+.gen-1-gen .pcg-dual-pri {
+    right: 13.5%;
+    z-index: 3;
+}
+/* Set badge - MEASURED on pokecardgenerator by diffing the canvas with the badge on/off:
+   left65.14% top37.87% right97% bottom47.85%, i.e. it sits over the ARTWORK's lower-right
+   (window bottom is 47%), 31.85% of card width wide. PokeHub had it tiny (11cqw) parked at the
+   very bottom of the card (right:8% bottom:2.5%) - nothing like the reference. */
+/* Set badge - re-measured against pokecardgenerator (Ultra Beast + axolotl badge, card-bounds
+   corrected): the badge sits at the photo's lower-right, centre y 40.66%, right edge ~1.4% in,
+   ~17-18% of card width. The old 25.5cqw at top 37.87% rendered too big and too low (its centre
+   fell at ~49% over the dex line). translateY(-50%) centres it on `top` so badges of any aspect
+   keep the same centre. */
+/* SV shares that box, measured on the reference's own SV render the same way (toggle the badge
+   tile, diff the canvas): badge-chansey lands at cx89.59% cy40.70%, 18.06% of the card wide and
+   18.01% in width-units tall - within 0.1% of the tcg numbers above, so it is one rule, not two.
+   PokeHub had SV at `right:8% bottom:2.3% width:11cqw`, i.e. a small badge parked on the card's
+   bottom edge, ~44% of the card height below where the reference draws it.
+   NOTE badge-scarlet-violet.webp is the odd one out - an 898x1130 canvas holding a WORDMARK band
+   (ink is only the middle 22.8% of its height, full width), so the reference renders that one
+   ~40% wide across the artwork. It is a wordmark, not a set symbol; sizing the shared rule around
+   it would blow up every round badge, so it is left to `contain` inside the same box. */
+/* Centred by the BOX, never by `transform`: holo.css owns transforms on every image in the card
+   (`.card__rotator img:not(.card__back) { transform: translate3d(0,0,0.01px) }`, specificity 0-2-1)
+   and beats any `.gen-x .pcg-badge` rule (0-2-0), so the `translateY(-50%)` that used to sit here
+   was silently dropped - the badge hung a half-height LOW on tcg-gen too, for as long as the rule
+   has existed. A square 18cqw box with `object-fit: contain` (base rule above) needs no transform:
+   any aspect centres itself inside it, and `top` places the box, not the ink. */
+.gen-tcg-gen .pcg-badge,
+.gen-scarlet-violet .pcg-badge {
+    right: 1.5%;
+    top: calc(40.66% - 9cqw);
+    bottom: auto;
+    width: 18cqw;
+    height: 18cqw;
+    /* Round symbols then land on the measured right edge instead of floating off it when a
+       wide wordmark badge leaves slack in the box. */
+    object-position: right center;
+    z-index: 3;
+}
+/* tcg-gen & SV bake only weakness + retreat pills (no resistance) -> 2 columns. */
+.gen-tcg-gen .pcg-wrr,
+.gen-scarlet-violet .pcg-wrr {
+    grid-template-columns: 1fr 1fr;
+}
+.gen-tcg-gen .pcg-wrr > span:nth-child(2),
+.gen-scarlet-violet .pcg-wrr > span:nth-child(2) {
+    display: none;
+}
+/* TCG Pocket "Attribute frame". Rect and colours MEASURED on pokecardgenerator by switching the
+   control and diffing its canvas: the change is confined to L7.17-92.83% / T8.79-50.66% and repaints
+   only ~11% of the pixels inside it, i.e. a decorative BORDER around the art window and the
+   attribute strip below it - not artwork, which is why this is CSS rather than an asset.
+   Border colours sampled off the left edge of each style: grey rgb(184,192,192) silver,
+   black rgb(24,24,24), mega rgb(40,40,40) with lighter banding, and shining a cyan
+   rgb(80,160,184) running through the greys - so that one is a gradient via border-image. */
+.pcg-attr-frame {
+    left: 7.17%;
+    top: 8.79%;
+    right: 7.17%;
+    bottom: 49.34%;
+    border-style: solid;
+    border-width: 0.85cqw;
+    pointer-events: none;
+    z-index: 2;
+}
+.pcg-attr-frame[data-style='grey'] {
+    border-color: #b8c0c0;
+}
+.pcg-attr-frame[data-style='black'] {
+    border-color: #181818;
+}
+.pcg-attr-frame[data-style='mega'] {
+    border-color: #282828;
+}
+.pcg-attr-frame[data-style='shining'] {
+    border-color: transparent;
+    border-image: linear-gradient(135deg, #a8b0b0 0%, #50a0b8 30%, #a8b8b8 55%, #50a0b8 80%, #a8b0b0 100%) 1;
+}
+
+/* Tag stamp - MEASURED on pokecardgenerator by diffing the canvas with the tag on/off:
+   box left66.45% top10.07% right97.13% bottom16.51%, i.e. 30.68% of card width x 6.44% of
+   card height, 2.87% in from the right.
+
+   Sized by that BOX, not by height alone. Height-driven sizing makes the width follow each
+   asset's aspect, and tcg's six tags run 3.00 (ultra-beast 300x100) to 3.57 (single-strike
+   232x65): at the old height:10.5cqw they rendered 31.5-37.5% wide and 7.54% tall, i.e. every
+   one over the reference and swinging 6% of card width between stamps. A fixed box with
+   object-fit:contain caps them all at the measured extent whatever their aspect, and
+   object-position pins them to the box's RIGHT edge so a squarer stamp does not float inward
+   off the corner it belongs in. */
+.gen-tcg-gen .pcg-tag {
+    top: 10.07%;
+    right: 2.87%;
+    width: 30.68cqw;
+    height: 6.44%;
+    z-index: 3;
+}
+
+/* ===================================================================
+   TCG POCKET - Full Art + Trainer templates (variant axis).
+   Assets are pokecardgenerator's own: full-art.webp / trainer-full-art.webp are holo BORDERS with a
+   transparent centre (full-bleed art); trainer-<sub>.webp is a windowed trainer frame. Measured
+   transparent regions: full-art centre inset ~4%; trainer-supporter photo window x8.8-91% y14.6-51.3%.
+   =================================================================== */
+/* Full-bleed: photo + border frame both fill the card (their transparent centres line up). */
+.pcg.is-fullbleed .pcg-photo,
+.pcg.is-fullbleed .pcg-frame {
+    inset: 0;
+    width: 100%;
+    height: 100%;
+}
+.pcg.is-fullbleed .pcg-photo {
+    object-fit: cover;
+}
+/* tcg FULL ART: name / HP / stage / species / attacks all WHITE over the full-bleed art (the shared
+   `.card[data-variant*='full-art']` rule already whitens them - no dark override). Name left-aligns
+   with the body, and the photo anchors to the TOP so the head is never cropped above the frame. */
+/* Full Art keeps the REGULAR header position - it does NOT left-align to the body. Measured on
+   pokecardgenerator by blanking its name field and refilling: a 2-character and a 12-character
+   name both start at L18.57% and grow rightwards, i.e. the name is anchored at 18.57% exactly
+   like Regular (18.75%). We were shifting the whole row to left:7%, ~11.6% out. The old
+   "name left-aligns with the body" note was an assumption, never a measurement.
+
+   The type disc for EVERY single-type tcg card, not just Full Art. `basic-<type>.webp` was
+   believed to bake it, but sampling the measured badge box across all twelve frames found a dark
+   ring in basic-steel.webp alone - the other ten are flat frame colour there, so those types were
+   drawing no badge at all. full-art.webp bakes nothing either (transparent-centre border, 86.5%
+   alpha-0), so one rule now serves both and they put the type in the same corner, as upstream does.
+
+   Centred on the baked disc (cx90.35%, cy5.14%) at 6.9cqw rather than sat on its exact box at
+   6.5cqw: 6.5 spans y2.77-7.41% and leaves a sliver of steel's baked ring showing at the bottom
+   (it runs to 7.5%). 6.9 spans x86.90-93.80% / y2.68-7.60% and swallows it with ~0.15% to spare,
+   while still reading the same size as the frame's own badge. */
+.card.gen-tcg-gen .pcg-tcg-emblem {
+    right: 6.2%;
+    top: 2.68%;
+    height: 6.9cqw;
+    z-index: 3;
+}
+/* Full Art has no dex strip: upstream REMOVES the whole Attributes panel for this template, so
+   the number/category inputs that feed the line do not exist, and its render shows no line
+   between the art and the attacks. Ours drew one over the artwork. */
+.card.gen-tcg-gen[data-variant='full-art'] .pcg-species {
+    display: none;
+}
+.card.gen-tcg-gen[data-variant='full-art'] .pcg-photo {
+    object-position: top center;
+}
+/* Full art keeps the regular card's silver weakness/retreat pills (bottom-card-no-name.webp). The pills
+   are silver, so their content stays DARK (overriding the all-white full-art rule) and left-aligns
+   behind the drawn label - unlike the regular frame, no "weakness"/"retreat" word is baked here. */
+.card.gen-tcg-gen[data-variant='full-art'] .pcg-fa-bottom {
+    position: absolute;
+    left: 7.39%;
+    top: 86%;
+    width: 85.22%;
+    height: auto;
+    z-index: 2;
+}
+.card.gen-tcg-gen[data-variant='full-art'] .pcg-wrr {
+    z-index: 3;
+    color: #333;
+    text-shadow: none;
+}
+.card.gen-tcg-gen[data-variant='full-art'] .pcg-wrr > span {
+    padding-left: 5%;
+    justify-content: flex-start;
+}
+.pcg-wrr-lbl {
+    display: none;
+}
+.card.gen-tcg-gen[data-variant='full-art'] .pcg-wrr-lbl {
+    display: inline;
+    margin-right: 0.6cqw;
+    font-size: 2.4cqw;
+    font-weight: 700;
+    color: #444;
+}
+
+/* TCG Trainer (Supporter/Item/Stadium/Tool): header "Supporter | TRAINER" is baked; below it a NAME
+   row (big LEFT title + HP on the right, y~8.4-14%), then the photo window (y14.6-52.6%), rules text
+   in the white plate, illustrator bottom-left. Measured off pokecardgenerator's own trainer render. */
+.pcg-tcg-trainer .pcg-photo {
+    left: 8.8%;
+    top: 14.6%;
+    width: 82.2%;
+    height: 38%;
+    object-fit: cover;
+}
+/* left 4.78% / top 6.94%: measured on pokecardgenerator's tcg Trainer by blanking its name field
+   and refilling - a 2-char and an 8-char name both start at L4.78%, and the ink runs T8.79-B11.81%.
+   Ours sat at left 6% with its baseline at 13.27%, i.e. 1.22% right and 1.46% low. */
+.pcg-tcg-trainer .pcg-tr-name {
+    position: absolute;
+    left: 4.78%;
+    top: 6.94%;
+    max-width: 66%;
+    font-size: 6.4cqw;
+    font-weight: 800;
+    color: #101010;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+/* right 6.99% / top 8.1%: measured by nudging the reference's HP stepper and diffing its canvas -
+   the HP ink lands L86.40-R93.01%, T8.66-B11.94%, i.e. on the name's line. Ours ended at 96.5%
+   (3.49% too far right) with its baseline 1.70% low, which is what made the row look crooked. */
+.pcg-tcg-trainer .pcg-tr-hp {
+    position: absolute;
+    right: 6.99%;
+    top: 8.1%;
+    display: flex;
+    align-items: baseline;
+    gap: 0.5cqw;
+    font-size: 5cqw;
+    font-weight: 800;
+    color: #101010;
+}
+.pcg-tcg-trainer .pcg-tr-hp small {
+    font-size: 0.5em;
+}
+.pcg-tcg-trainer .pcg-tr-text {
+    position: absolute;
+    left: 11%;
+    top: 55%;
+    width: 78%;
+    height: 28%;
+    display: flex;
+    align-items: center;
+}
+.pcg-tcg-trainer .pcg-tr-text p {
+    font-size: 3.1cqw;
+    line-height: 1.34;
+    color: #1c1c1c;
+}
+/* The reference's tcg Trainer has NO dex fields at all (its trainer template exposes only
+   trainerLabel / name / description / illustrator / rule); the one thing in this band is its
+   footer credit at L6.25%, ink y90.55-91.73%. Our NO. line is PokeHub's own GitHub content, so it
+   stays - it just sits in the reference's footer slot now instead of its own spot. */
+.pcg-tcg-trainer .pcg-tr-dex {
+    position: absolute;
+    left: 6.25%;
+    top: 90.19%; /* puts the baseline on 91.73%, the reference's footer ink bottom */
+    /* 25.4%, not 42%: the frame bakes a coloured footer band from x32% (measured on all three
+       trainer frames: supporter 32.14%, item 31.94%, stadium 32.14%), so the light strip ends
+       there. At 42% the line overran it. nowrap+ellipsis is the backstop - a long login or
+       language must truncate here, never spill onto the band again. */
+    width: 25.4%;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-size: 2.3cqw;
+    font-style: italic;
+    color: #333;
+}
+/* Trainer Full Art: trainer-full-art.webp is a holo BORDER with a transparent centre, so the photo is
+   full-bleed. Unlike a plain full-art, pokecardgenerator STILL draws the light "Supporter | TRAINER"
+   header chrome (with the name/HP dark on it) + an orange rule bar over the art; PcgFace adds both
+   (fa-only), so name/HP stay DARK on the chrome and only the description + illustrator go white. */
+.pcg-tcg-trainer.is-fullbleed .pcg-photo {
+    inset: 0;
+    width: 100%;
+    height: 100%;
+}
+.pcg-tcg-trainer.is-fullbleed .pcg-tr-text p,
+/* Darkness is the ONE type whose frame is dark exactly where the body text sits. Sampled
+   basic-dark.webp: luminance 37 on the name row, 45 on the attacks, 28 on the flavor - against
+   249 on the dex strip and 241 on the weakness/retreat pills, which are baked LIGHT bands on
+   every frame regardless of type. So the body text goes white and those two deliberately do not:
+   a blanket white would just move the unreadability onto the dex line and the W/R/R row. */
+.card.darkness .gen-tcg-gen .pcg-name,
+.card.darkness .gen-tcg-gen .pcg-hp b,
+.card.darkness .gen-tcg-gen .pcg-hp small,
+.card.darkness .gen-tcg-gen .pcg-atkname,
+.card.darkness .gen-tcg-gen .pcg-dmg,
+.card.darkness .gen-tcg-gen .pcg-atkdesc,
+.card.darkness .gen-tcg-gen .pcg-flavor,
+.card.darkness .gen-scarlet-violet .pcg-name,
+.card.darkness .gen-scarlet-violet .pcg-hp b,
+.card.darkness .gen-scarlet-violet .pcg-hp small,
+.card.darkness .gen-scarlet-violet .pcg-atkname,
+.card.darkness .gen-scarlet-violet .pcg-dmg,
+.card.darkness .gen-scarlet-violet .pcg-atkdesc,
+.card.darkness .gen-scarlet-violet .pcg-flavor {
+    color: #fff;
+    /* the type rules put a white 1px shadow under the name for contrast on a LIGHT frame; under
+       white text on a dark frame it does nothing but soften the glyphs. */
+    text-shadow: none;
+}
+
+.pcg-tcg-trainer.is-fullbleed .pcg-tr-dex {
+    color: #fff;
+    text-shadow:
+        0 1px 4px rgba(0, 0, 0, 0.9),
+        0 0 2px rgba(0, 0, 0, 0.7);
+}
+/* name / HP ride the opaque header chrome, so keep them dark and above it. */
+.pcg-tcg-trainer.is-fullbleed .pcg-tr-name,
+.pcg-tcg-trainer.is-fullbleed .pcg-tr-hp {
+    z-index: 3;
+}
+.pcg-tcg-trainer.is-fullbleed .pcg-tr-text {
+    top: 46%;
+    z-index: 3;
+}
+/* Trainer Full Art chrome = pokecardgenerator's OWN pieces composited over the full-bleed art (the
+   holo-border asset has a transparent centre). The header band asset is full-width and ~11.6% tall
+   (aspect 5.78) so it carries the "TRAINER" line AND the silver backing the name/HP sit on. */
+.pcg-tr-fa-header {
+    position: absolute;
+    left: 3%;
+    top: 2.2%;
+    width: 94%;
+    height: auto;
+    z-index: 2;
+}
+/* Orange "Supporter" label plate, top-left of the band (its text is in the upper part; the empty
+   lower part is transparent and the name paints over it). */
+.pcg-tr-fa-sup {
+    position: absolute;
+    left: 4.5%;
+    top: 2.4%;
+    width: 19%;
+    height: auto;
+    z-index: 3;
+}
+/* Thin gold side rails down the art edges (ribbed asset, natural height). */
+.pcg-tr-fa-side {
+    position: absolute;
+    top: 13.4%;
+    width: 1.9cqw;
+    height: auto;
+    z-index: 2;
+}
+.pcg-tr-fa-side-l {
+    left: 2.6%;
+}
+.pcg-tr-fa-side-r {
+    right: 2.6%;
+}
+/* Orange supporter rule footer (real asset) over the art, bottom-right, rule text drawn on top. */
+.pcg-tr-rule {
+    position: absolute;
+    right: 4%;
+    bottom: 4.2%;
+    width: 46%;
+    z-index: 3;
+}
+.pcg-tr-rule-bg {
+    display: block;
+    width: 100%;
+    height: auto;
+}
+.pcg-tr-rule p {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    padding: 0 11% 0 6%;
+    font-size: 2.3cqw;
+    line-height: 1.14;
+    font-weight: 600;
+    color: #3a2405;
+}
+/* Rarity pip tucks directly UNDER the weakness pill (pill x7.39-48.1%, bottom 89.29%). */
+/* Pip band measured on the reference by swapping rarity symbols and diffing its canvas. Four
+   independent pairs (d1/d2, d1/d4, d1/star1, d1/crown) ALL agree on T91.73% B94.62%, so the band
+   is ground truth; the leftmost ink is 7.17%. Ours sat at top 90.4% - which is the reference's
+   ILLUSTRATOR line (T90.16-91.34%), i.e. our pips were one row too high, in the wrong band - and
+   at 3cqw they were only 2.14% of card height against the measured 2.89%.
+   4.05cqw = 2.89% of card height at this card's 0.714 aspect. */
+.gen-tcg-gen .pcg-rarity {
+    left: 7.17%;
+    top: 91.73%;
+    bottom: auto;
+    height: 4.05cqw;
+    z-index: 3;
+}
+/* Name icon - site diff gives w9.4% / h2.99% of the card, so 9.4cqw (base is 11cqw). */
+.gen-tcg-gen .pcg-name-emblem {
+    width: 9.4cqw;
+}
+.gen-scarlet-violet .pcg-tag {
+    top: 10.5%;
+    right: 10%;
+    height: 4.2cqw;
+    z-index: 3;
+}
+/* SV shows ONE small rarity mark, not a pip row. Measured by swapping between rare /
+   illustration-rare / ace-spec and diffing: three pairs all land on L5.15-R7.72%, T94.75-B96.59%
+   - a 2.57% x 1.84% mark in the bottom-left. Ours was 2.85% too far right, ~1.6% too low and
+   ~40% oversized. 2.58cqw = 1.84% of card height. Anchored by `top`, not `bottom`, so the band
+   is pinned where it was measured rather than floating off the card edge. */
+.gen-scarlet-violet .pcg-rarity {
+    left: 5.15%;
+    top: 94.75%;
+    bottom: auto;
+    height: 2.58cqw;
+    z-index: 3;
+}
+
+/* Align the holo glare / foil clip to each generation's photo window
+   (the CSS card's default --clip targets PokeHub's own window position). */
+/* gen-1's photo window is a SHARP rectangle - drop the `round 2%` (rounded
+   corners clipped the cosmos/holo foil at the corners) and size the clip to the
+   frame's transparent hole: L11.80 T12.71 R87.80 B52.3. */
+.card.gen-1-gen:not(.is-full) {
+    --clip: inset(12.71% 12.2% 47.7% 11.8%);
+    /* Stage: same window, but notch out the baked gold pre-evolution SUNBURST in
+       the top-left so the foil never shimmers over the evo box. Shape traced from
+       the frame's opaque pixels - the sunburst's right edge tapers 24%@window-top
+       down to its tip ~(15%,18%). The notch hugs the GOLD edge (stays inside the
+       opaque sunburst), so the surrounding photo keeps its foil with no bare gap.
+       The thumbnail itself is also lifted above the foil (see .pcg-evolve img). */
+    --clip-stage: polygon(23.5% 12.71%, 87.8% 12.71%, 87.8% 52.3%, 11.8% 52.3%, 11.8% 17.5%, 16.5% 17.5%, 18.5% 15.7%, 20.5% 14.7%, 23.5% 12.71%);
+    /* Reverse Holo foils the BORDER, so holo.css clips it with var(--clip-invert): the same
+       window punched out as a hole. SV got this; 1-gen and tcg never did, so both fell back to
+       card.css's generic 8/12/92/53 - a hole ~4% too wide on each side, leaving an unfoiled band
+       around the artwork and stopping the foil short of the photo edge. Same rect as --clip
+       above (L11.8 T12.71 R87.8 B52.3); if one moves, this must move with it. */
+    --clip-invert: polygon(0% 0%, 100% 0%, 100% 100%, 0% 100%, 0% 12.71%, 87.8% 12.71%, 87.8% 52.3%, 11.8% 52.3%, 11.8% 12.71%, 0% 12.71%);
+}
+/* card.css clips the base glare (the white light/highlight sheen) to the rectangle
+   --clip with !important. On stage cards that sheen would still wash over the
+   pre-evo sunburst, so re-clip the glare to the notched --clip-stage as well -
+   the foil (shine) alone being notched isn't enough. */
+.card.gen-1-gen:not(.is-full)[data-subtypes^='stage'] .card__glare {
+    clip-path: var(--clip-stage) !important;
+}
+/* trainer's artwork window sits lower: L11.38 T24.29 R89.82 B55.71 (also square). */
+.card.gen-1-gen[data-variant='trainer']:not(.is-full) {
+    --clip: inset(24.29% 10.18% 44.29% 11.38%);
+    --clip-stage: inset(24.29% 10.18% 44.29% 11.38%);
+    --clip-trainer: inset(24.29% 10.18% 44.29% 11.38%);
+    --clip-invert: polygon(0% 0%, 100% 0%, 100% 100%, 0% 100%, 0% 24.29%, 89.82% 24.29%, 89.82% 55.71%, 11.38% 55.71%, 11.38% 24.29%, 0% 24.29%);
+}
+.card.gen-tcg-gen:not(.is-full) {
+    /* Sized to the frame's transparent window (L8.18 T9.57 R91.82 B47), measured from
+       basic-*.webp. The old 9.4/8.2/53.2/8.4 stopped ~0.2% short at the left and bottom,
+       so the foil did not reach the edge of the photo (same bug as gen-1's clip). */
+    --clip: inset(9.57% 8.18% 53% 8.18%);
+    /* MUST also be set for stage: holo.css clips the shine with var(--clip-stage) whenever
+       data-subtypes^="stage", and without this it fell back to card.css's generic
+       inset(12% 8% 47% 8%) - so the foil on a Stage 1/2 card sat in the wrong place while the
+       glare (which uses --clip) was correct. No notch needed here: the stage chrome and its
+       photo are lifted ABOVE the foil in 3D, like 1st gen. */
+    --clip-stage: inset(9.57% 8.18% 53% 8.18%);
+    /* Same rect as --clip, punched out as a hole - see the 1-gen block for why. */
+    --clip-invert: polygon(0% 0%, 100% 0%, 100% 100%, 0% 100%, 0% 9.57%, 91.82% 9.57%, 91.82% 47%, 8.18% 47%, 8.18% 9.57%, 0% 9.57%);
+}
+/* Measured off the SV frames themselves (745x1040, all 10 types agree): the transparent photo
+   window is L8.46% T10.10% R92.35% B47.50%. The old 9/8/53/8 was unsourced and out by ~1.1% at
+   the top. Corners are SQUARE - scanning five depths gives a constant left edge of 8.46% and five
+   columns give a constant top of 10.10%, which a rounded corner could not do - so `round 2%` is
+   dropped, exactly as it was for 1-gen and tcg.
+
+   --clip-stage is the important one: holo.css clips the SHINE with var(--clip-stage) whenever
+   data-subtypes^="stage". SV defined ONLY --clip, so every Stage 1/2 card silently fell back to
+   card.css's generic inset(12% 8% 47% 8%) and the foil sat in the wrong place - while the glare,
+   which reads --clip, was correct. That half-right look is the giveaway for this bug; tcg-gen had
+   the identical defect. --clip-trainer likewise: SV ships no trainer frame, so a trainer variant
+   renders the normal typed face and wants the normal window. */
+.card.gen-scarlet-violet:not(.is-full) {
+    --clip: inset(10.1% 7.65% 52.5% 8.46%);
+    --clip-stage: inset(10.1% 7.65% 52.5% 8.46%);
+    --clip-trainer: inset(10.1% 7.65% 52.5% 8.46%);
+    /* Reverse Holo puts the foil on the BORDER instead of the window, so holo.css clips it with
+       var(--clip-invert) - the same rect punched out as a hole. Only card.css ever defined it, at
+       the generic 12/92/53/8, so a reverse-holo SV card had its foil hole in the wrong place.
+       Same defect family as --clip-stage above: one variable set, its siblings forgotten. */
+    --clip-invert: polygon(0% 0%, 100% 0%, 100% 100%, 0% 100%, 0% 10.1%, 92.35% 10.1%, 92.35% 47.5%, 8.46% 47.5%, 8.46% 10.1%, 0% 10.1%);
+}
+/* TCG Pocket per-template foil clip. `.gen-tcg-gen:not(.is-full)` above clips every tcg
+   card to the REGULAR photo window (top rect), but full-art art is full-bleed and the
+   trainer photo window sits lower/bigger - so those two need their own clip or the foil
+   lands in the wrong place. These come AFTER the block above (equal specificity) so they win. */
+/* Full Art + Trainer Full Art: art fills the card inside the ~4% holo border, so the foil
+   covers the WHOLE art, not a top window (point 1: "full art support holo hanya yg full art"). */
+.card.gen-tcg-gen[data-variant*='full-art'] {
+    --clip: inset(4% 4% 4% 4% round 3%);
+    --clip-stage: inset(4% 4% 4% 4% round 3%);
+    --clip-trainer: inset(4% 4% 4% 4% round 3%);
+}
+/* Trainer: foil only on the photo window (L8.8 T14.6 W82.2 H38 -> R9 B47.4). Without this the
+   foil stayed in the regular window and read as offset (point 3: "holo untuk photo saja"). */
+.card.gen-tcg-gen[data-variant='trainer'] {
+    --clip: inset(14.6% 9% 47.4% 8.8%);
+    --clip-stage: inset(14.6% 9% 47.4% 8.8%);
+    --clip-trainer: inset(14.6% 9% 47.4% 8.8%);
+}
+
+/* =========================================================
+   VARIANT / TEMPLATE (pokecardgenerator "Template"). data-variant is on the
+   .card wrapper. Full-art templates let the artwork fill the whole card; trainer
+   templates drop the Pokémon type chrome. Regular = default (no rule needed).
+   ========================================================= */
+/* Full-art (full-art, full-art-ex, trainer-full-art): the artwork fills the whole
+   card, the type-frame body is hidden (only the decorative frame-overlay border +
+   overlaid text remain), and the text goes white with a shadow for legibility. */
+.card[data-variant*='full-art'] .pcg-photo {
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    border-radius: inherit;
+}
+/* Old modern-face full-art hid the type frame (its border came from a frame-OVERLAY). TCG Pocket's
+   full-art / trainer-full-art use a real holo-border asset AS the .pcg-frame, so it must stay visible
+   there -- only hide the frame for non-tcg full-art. */
+.card:not(.gen-tcg-gen)[data-variant*='full-art'] .pcg-frame:not(.pcg-frame-overlay) {
+    opacity: 0;
+}
+.card[data-variant*='full-art'] .pcg {
+    color: #fff;
+}
+.card[data-variant*='full-art'] .pcg-name,
+.card[data-variant*='full-art'] .pcg-stage,
+.card[data-variant*='full-art'] .pcg-species,
+.card[data-variant*='full-art'] .pcg-atkname,
+.card[data-variant*='full-art'] .pcg-atkdesc,
+.card[data-variant*='full-art'] .pcg-dmg,
+.card[data-variant*='full-art'] .pcg-flavor,
+.card[data-variant*='full-art'] .pcg-wrr,
+.card[data-variant*='full-art'] .pcg-hp small,
+.card[data-variant*='full-art'] .pcg-hp b {
+    color: #fff;
+    text-shadow:
+        0 1px 4px rgba(0, 0, 0, 0.9),
+        0 0 2px rgba(0, 0, 0, 0.7);
+}
+/* Plain Trainer: trainers have no element type - drop the dual diagonal + emblems. */
+.card[data-variant='trainer'] .pcg-frame2,
+.card[data-variant='trainer'] .pcg-topright .pcg-emblem,
+.card[data-variant='trainer'] .pcg-dual-sec,
+.card[data-variant='trainer'] .pcg-dual-pri {
+    display: none;
+}
+
+/* =========================================================
+   1st-gen TRAINER face (trainer.webp): a "TRAINER" banner is baked in, with a name
+   below it, the artwork window, and a metal effect-text plate. No HP / attacks /
+   weakness chrome. Window measured L11.4% T24.3% W78.2% H31.3%; plate ~62-90%.
+   ========================================================= */
+.pcg-trainer {
+    color: #1b1b1b;
+}
+.pcg-trainer .pcg-photo {
+    /* bleed ~1% past the transparent window (L11.38 T24.29 R89.82 B55.71) so the
+       photo tucks under the frame bevel on every side - no dark gap on R/B. */
+    left: 10.4%;
+    top: 23.3%;
+    width: 80.4%;
+    height: 33.4%;
+    object-fit: cover;
+}
+.pcg-trainer-name {
+    left: 10.5%;
+    top: 17.4%;
+    max-width: 80%;
+    font-family: 'PCG Cond', 'PCG', sans-serif;
+    font-weight: 700;
+    font-size: 5.6cqw;
+    line-height: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: #171717;
+    text-shadow: 0 1px 0 rgba(255, 255, 255, 0.4);
+}
+/* The effect plate. A real Base Set Trainer has no attacks, so the flavor is the only
+   prose here (PcgFace drops the attacks for this template) and it has to carry the plate
+   on its own -- hence centred rather than top-aligned, and sized like TCG rules text
+   rather than the small italic caption it is on a Pokemon card. */
+.pcg-trainer-text {
+    left: 13%;
+    top: 64.5%;
+    width: 74%;
+    height: 23%;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 0.7cqw;
+}
+.pcg-trainer-flavor {
+    font-style: italic;
+    font-size: 3.3cqw;
+    line-height: 1.3;
+    text-align: center;
+    color: #2b2b2b;
+}
+/* dex/repo line on the bottom-screw line of the plate (~91.6%), between the two screws */
+.pcg-trainer-dex {
+    left: 8%;
+    top: 90.4%;
+    width: 84%;
+    text-align: center;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-weight: 700;
+    font-size: 2.3cqw;
+    color: #555;
+}
+/* Tag stamp on the TRAINER face: its artwork window sits lower (T24.29 R89.82)
+   than the basic window (T12.71 R87.80), so re-anchor the stamp to the trainer
+   window's top-right (same ~0.9% below top / ~1.1% inset from right). */
+.gen-1-gen.pcg-trainer .pcg-tag {
+    top: 25.2%;
+    right: 11.3%;
+}
+/* Rarity pip on the TRAINER face. The basic frame leaves a cream gap at 94.3-96.4% and
+   `.gen-1-gen .pcg-rarity` (bottom:3.4%) is tuned to sit in it. The trainer frame has no
+   such gap: its effect plate runs to ~92.1%, then a dark metal band 92.4-96.0%, then the
+   yellow border from 96.0%. At bottom:3.4% the pip spanned 94.96-96.60% and so sat ON the
+   border. bottom:5% centres it in the metal band instead (93.36-95.00%, band centre 94.2%). */
+.gen-1-gen.pcg-trainer .pcg-rarity {
+    bottom: 5%;
+}
+/* The trainer face puts the "EDITION 1" stamp somewhere else entirely: not on a dex line under
+   the artwork (it has none) but down inside the metal effect plate, beside the bottom-left
+   screw. Measured off pokecardgenerator's trainer render: L18.75% T88.85% W5.51%. */
+.gen-1-gen.pcg-trainer .pcg-first-edition {
+    left: 18.75%;
+    top: 88.85%;
+    width: 5.51%;
+}

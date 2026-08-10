@@ -1,0 +1,454 @@
+/* =========================================================
+   PokeHub card chrome - extracted verbatim from the original
+   frontend/src/index.css (the non-Tailwind, card-specific rules).
+   Governs holo foil clipping, per-type frame colours, and the
+   click-to-enlarge overlay. Pairs with pcg.css + public/holo.css.
+   ========================================================= */
+
+:root {
+    --font-card: 'Cabin', 'Gill Sans', 'Gill Sans MT', 'Calibri', 'Segoe UI', sans-serif;
+    --warm-white: hsl(40 28% 92%);
+    --gold: #ecc417;
+    --gold-lt: #ffe071;
+    --gold-dk: #7c6413;
+}
+
+/* =========================================================
+   The 151-era variable layer (ported from simeydotme/pokemon-cards-151)
+   =========================================================
+   public/holo.css is a flatten of TWO upstream repos, not one:
+     - simeydotme/pokemon-cards-css  -> the SwSh sections (all 17 recipes)
+     - simeydotme/pokemon-cards-151  -> the 8 extra sections (ex-regular, ex-full-art,
+       ex-special-illustration-rare, illustration-rare, hyper-rare, poke-ball-holo, ...)
+   The 151 repo's variable layer (its own cards.css + cards/base.css) was never ported,
+   so every var below was USED by those 8 sections but DEFINED nowhere. CSS drops any
+   declaration referencing an undefined var ("invalid at computed-value time"), silently
+   and with no 404 -- which is why Special Illustration / Hyper Rare rendered their shine,
+   shine:before/:after, glitter and glitter:before/:after as `none` and showed only a
+   white masked glare2, and why Double Rare's glitter and Poke/Master Ball's inner foil
+   were blank.
+   Values are verbatim from that repo (cards.css:3-40, cards/base.css:41-42); only the
+   texture urls are re-pointed at local mirrors under /img/foils/151 (see that README)
+   instead of its CDN. */
+.card {
+    /* colour-stop LISTS (not colours) -- pokemon-cards-151/public/css/cards/base.css:41-42 */
+    --sunpillar: var(--sunpillar-1) 25%, var(--sunpillar-2), var(--sunpillar-3), var(--sunpillar-4), var(--sunpillar-5), var(--sunpillar-6) 75%;
+    --holo:
+        var(--sunpillar-1), var(--sunpillar-2), var(--sunpillar-3), var(--sunpillar-4), var(--sunpillar-5), var(--sunpillar-6), var(--sunpillar-1);
+
+    /* iridescent + noise tiles -- pokemon-cards-151/public/css/cards.css:5-18.
+     Only the ones public/holo.css actually reads are mirrored: iri1 (poke/master ball
+     inner foil), iri7/8/9 (SIR + hyper rare glitter), noise (ball inner foil),
+     birthday-dank(2) (double rare glitter accent). iri2-6 and --birthday are unused here. */
+    --iri1: url('/img/foils/151/iri-1.webp');
+    --iri7: url('/img/foils/151/iri-7.webp');
+    --iri8: url('/img/foils/151/iri-8.webp');
+    --iri9: url('/img/foils/151/iri-9.webp');
+    --noise: url('/img/foils/151/noise-base.webp');
+    --noise-over: url('/img/foils/151/noise-top.webp');
+    --birthday-dank: url('/img/foils/151/birthday-holo-dank.webp');
+    --birthday-dank2: url('/img/foils/151/birthday-holo-dank-2.webp');
+
+    /* pokemon-cards-151/public/css/cards.css:39 -- gates the ball-holo foil to the
+     border ring; without it clip-path fell back to `none` and it covered the whole card. */
+    --clip-borders-invert: polygon(
+        94.8% 2.8%,
+        95.7% 3.2%,
+        96.2% 3.8%,
+        96.2% 96%,
+        95.9% 96.8%,
+        94.8% 97.3%,
+        5% 97.3%,
+        4.2% 96.9%,
+        3.8% 96.2%,
+        3.8% 6.1%,
+        15% 6.1%,
+        16% 5%,
+        17.9% 4%,
+        19% 2.8%
+    );
+
+    /* Upstream drives this from a spring (Card.svelte:255, `--rotate-delta: ${$springRotateDelta.x}deg`)
+     that only moves for its pop-out/active tilt; it rests at 0. This port has no such
+     spring, so 0deg is the correct neutral -- and defining it is what revives the SIR /
+     hyper rare shine:after gradients, whose ANGLE is calc((--rotate-x) - (--rotate-delta)). */
+    --rotate-delta: 0deg;
+
+    /* NOT defined here on purpose: --clip-trainer-invert. It is used at holo.css:534 and
+     :4688 but is undefined in BOTH upstream repos too -- a faithful port of an upstream
+     bug, not a gap of ours. Leave it unless upstream fixes it. */
+}
+
+/* =========================================================
+   HOLO overrides + clip
+   ========================================================= */
+.card {
+    width: 100%;
+    --foil: none;
+    --mask: none;
+    font-family: var(--font-card);
+    /* Resting pointer state. The JS hook only sets these AFTER the first hover;
+     without defaults `opacity: var(--card-opacity)` is invalid -> defaults to 1,
+     so every foil renders at full blast at rest (blows out over light avatars).
+     These defaults are the resting state; the foil reveals as the pointer moves. */
+    --pointer-x: 50%;
+    --pointer-y: 50%;
+    --background-x: 50%;
+    --background-y: 50%;
+    --rotate-x: 0deg;
+    --rotate-y: 0deg;
+    --pointer-from-center: 0;
+    --pointer-from-top: 0.5;
+    --pointer-from-left: 0.5;
+    /* Upstream defaults these in its own resting block and drives them from JS springs
+     (the hover pop-out). This port keeps the resting block but not the springs, so they
+     must still be DEFINED: without them holo.css's `.card__translater` transform
+     `translate3d(var(--translate-x),...) scale(var(--card-scale))` is invalid at
+     computed-value time and drops to `none`. 1/0/0 is the neutral identity - no pop-out,
+     just valid. Visually a no-op today (the resulting translateZ has no ancestor
+     perspective to project through), so this is fidelity, not a visible effect. */
+    --card-scale: 1;
+    --translate-x: 0px;
+    --translate-y: 0px;
+    /* subtle resting foil (a full-strength rest blows out light avatars);
+     the pointer hook ramps this to 1 on hover for the full holo reveal. */
+    --card-opacity: 0.3;
+}
+
+/* --foil / --mask are the per-card etch textures. Upstream sets them as an INLINE
+   style on .card (CardProxy.svelte builds a CDN url from the card's set+number, so
+   each real card gets ITS OWN etch), and .card inherits them down to the layers.
+   PokeHub's cards are GitHub avatars with no set/number, so there is nothing to key
+   on -- hence the `--foil: none` above, which leaves every consumer textureless.
+   Most rarities don't notice: holo.css sets its own --foil on their layers
+   (vmaxbg.jpg, illusion.png, trainerbg.png, ancient.png...), and a layer rule beats
+   the inherited value. Only these fall through to `none`, so only these are set here.
+
+   The textures are mirrored once from upstream's CDN into /img/foils (see that
+   folder's README) and named by upstream's own rarity -> {etch}_{style} mapping
+   (CardProxy.svelte foilMaskImage). They are 732x1024 -- full card size, matching
+   `mask-size: cover` -- unlike the old /img/geometric.png, a 300x300 tile that got
+   stretched over the whole card.
+
+   The pattern comes from a DIFFERENT card than the avatar, so it reads as a generic
+   etch rather than art-aligned foil. That is inherent: without a real set+number
+   there is no per-card texture to fetch.
+
+   Setting --foil on .card matches upstream exactly: it inherits down, and any layer
+   that sets its own --foil still wins.
+
+   Only FOUR rarities are set here, because only they actually consume it. Verified by
+   probing the resolved --foil on .card__shine for all 25 rarities, and by pixel-diffing
+   a 25-card grid with vs without the full upstream map:
+     - 10 rarities (reverse, radiant, vmax, vstar, ultra, rainbow, rainbow alt, secret,
+       shiny, pokeball) set their own --foil on their LAYERS, which shadows the value
+       inherited from .card -- the map never reaches them.
+     - 3 more (rare holo, cosmos, rare holo v) resolve it but no rule ever reads it.
+     - double rare consumes --mask to MASK its shine rather than to add a texture, so a
+       foreign card's mask can only subtract (measured: -2.0 mean luma, 9% of pixels
+       darkened). Left textureless on purpose.
+   Mapping the other 21 was tried and reverted: identical pixels, 5x the CSS. */
+
+/* Special Illustration + Hyper Rare paint glare2 as solid `background: white` masked by
+   --foil. With --foil: none there was no mask, so the white covered the ENTIRE card and
+   blew it out over light avatars (the "sangat terang"). A real etch mask fixes that at
+   the source -- measured on a light face at --card-opacity 1: blown pixels (luma >= 235)
+   3.50% -> 0.01%, mean luma 179.2 -> 164.0.
+   151-era tiers have no upstream mapping, so these two picks are ours: swsecret reads as
+   the gold/secret etch, sunpillar as the V/illustration etch. Swap the url if the other
+   reads better -- nothing else depends on the choice. */
+.card[data-rarity='hyper rare'] {
+    --foil: url('/img/foils/etched_swsecret_foil.webp');
+    --mask: url('/img/foils/etched_swsecret_mask.webp');
+}
+.card[data-rarity='special illustration rare'] {
+    --foil: url('/img/foils/etched_sunpillar_foil.webp');
+    --mask: url('/img/foils/etched_sunpillar_mask.webp');
+}
+/* Upstream's own mapping (CardProxy.svelte): amazing rare + rare shiny vmax ->
+   etched/swsecret. Both feed --foil into `background-image: var(--foil), ...` as an
+   additive texture layer, so this only adds what `none` was omitting. */
+.card[data-rarity='amazing rare'],
+.card[data-rarity='rare shiny vmax'] {
+    --foil: url('/img/foils/etched_swsecret_foil.webp');
+    --mask: url('/img/foils/etched_swsecret_mask.webp');
+}
+.card[data-rarity='special illustration rare'] .card__glare2,
+.card[data-rarity='hyper rare'] .card__glare2 {
+    opacity: calc(var(--card-opacity) * 0.85) !important;
+}
+.card:not(.is-full) {
+    --clip: inset(12% 8% 47% 8% round 2%);
+    --clip-invert: polygon(0% 0%, 100% 0%, 100% 100%, 0% 100%, 0% 12%, 92% 12%, 92% 53%, 8% 53%, 8% 12%, 0% 12%);
+    --clip-stage: inset(12% 8% 47% 8% round 2%);
+    --clip-trainer: inset(12% 8% 47% 8% round 2%);
+}
+.card.is-full {
+    --clip: inset(2.6% 2.6% 2.6% 2.6% round 3%);
+    --clip-invert: inset(2.6% 2.6% 2.6% 2.6% round 3%);
+}
+
+/* no white/edge glow on hover/focus; soft black depth shadow only */
+.card__rotator,
+.card__rotator:hover,
+.card__rotator:focus,
+.card__rotator:focus-visible,
+.card.active .card__rotator,
+.card.interacting .card__rotator {
+    outline: none !important;
+    box-shadow:
+        0 12px 26px -10px rgba(0, 0, 0, 0.72),
+        0 3px 10px -5px rgba(0, 0, 0, 0.5) !important;
+}
+/* Glare darkens via `overlay`; confine it to the art on framed cards so the
+   frame/text never darken on hover, and dampen it everywhere (kills edge white). */
+.card__glare {
+    opacity: calc(var(--card-opacity) * 0.5) !important;
+}
+.card:not(.is-full) .card__glare {
+    clip-path: var(--clip) !important;
+}
+
+/* authentic per-type frame colours */
+.card {
+    --frame: #b7bcbf;
+    --frame-d: #969b9f;
+}
+.card.water {
+    --frame: #4fa0dd;
+    --frame-d: #3a7fbc;
+}
+.card.fire {
+    --frame: #ec4b34;
+    --frame-d: #c5341f;
+}
+.card.grass {
+    --frame: #66c05c;
+    --frame-d: #4f9f4a;
+}
+.card.lightning {
+    --frame: #f4cb3a;
+    --frame-d: #d3a415;
+}
+.card.psychic {
+    --frame: #a862b0;
+    --frame-d: #8a4d92;
+}
+.card.fighting {
+    --frame: #c65f2f;
+    --frame-d: #a04820;
+}
+.card.darkness {
+    --frame: #5a6873;
+    --frame-d: #3d4850;
+}
+.card.metal {
+    --frame: #adb3b7;
+    --frame-d: #8b9195;
+}
+.card.dragon {
+    --frame: #cba634;
+    --frame-d: #a9861b;
+}
+.card.fairy {
+    --frame: #ec74ac;
+    --frame-d: #d4548e;
+}
+
+/* gallery: NO paint-containment (it clipped the tilted card); raise on hover */
+.card-slot {
+    position: relative;
+}
+.card-slot:hover,
+.card-slot:focus-within {
+    z-index: 30;
+}
+
+/* Poke Ball / Master Ball holo is a whole-card reverse-holo foil. On a full-art
+   layout the photo fills the card, so at full interaction that additive foil
+   washes the photo out. Dampen it on full-art only so the photo stays visible. */
+.card.is-full[data-rarity$='ball holo'] .card__shine,
+.card.is-full[data-rarity$='ball holo'] .card__shine:before,
+.card.is-full[data-rarity$='ball holo'] .card__shine:after {
+    opacity: calc(var(--card-opacity) * 0.5) !important;
+}
+
+/* =========================================================
+   Click-to-enlarge overlay (lightbox)
+   ========================================================= */
+.zoom-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    display: grid;
+    place-items: center;
+    padding: 4vh 4vw;
+    background: rgba(6, 8, 12, 0.74);
+    -webkit-backdrop-filter: blur(6px);
+    backdrop-filter: blur(6px);
+    animation: zoom-fade 0.18s ease-out;
+}
+.zoom-card {
+    /* fit by width on phones, by height on short/landscape screens */
+    width: min(90vw, 400px, calc(86vh * 0.718));
+    /* the fly-forward FLIP transform is applied inline by ZoomCard */
+    will-change: transform;
+}
+.zoom-close {
+    position: fixed;
+    top: 1rem;
+    right: 1rem;
+    z-index: 101;
+    display: grid;
+    place-items: center;
+    width: 2.5rem;
+    height: 2.5rem;
+    border-radius: 9999px;
+    color: #fff;
+    cursor: pointer;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    transition: background 0.15s ease;
+}
+.zoom-close:hover {
+    background: rgba(255, 255, 255, 0.22);
+}
+@keyframes zoom-fade {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+/* pop-in used by the live preview card */
+@keyframes pokehub-pop {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: none;
+    }
+}
+.animate-pop {
+    animation: pokehub-pop 0.35s ease both;
+}
+
+/* ---------------------------------------------------------------------------
+   Hero Poké Ball
+   ---------------------------------------------------------------------------
+   Draws itself in once, then loops the capture wobble with the button flashing
+   at the end - the one animation everybody recognises. Strokes and transforms
+   only, so it adds no gradient, no shadow and no image request.
+
+   The shapes carry pathLength="1", which normalises every path to a length of
+   1 regardless of its real geometry. That is what lets one dash rule draw a
+   circle and a two-segment line at the same rate without measuring either.
+   --------------------------------------------------------------------------- */
+
+.pokehub-ball svg {
+    /* Rocks about a point near the bottom of the ball, the way it does resting
+       on the ground - rotating about the centre reads as spinning, not wobbling. */
+    transform-origin: 50% 86%;
+}
+.pokehub-ball__draw {
+    stroke-dasharray: 1;
+    stroke-dashoffset: 0;
+}
+.pokehub-ball__btn {
+    fill: transparent;
+}
+
+@keyframes pokehub-draw {
+    from {
+        stroke-dashoffset: 1;
+    }
+    to {
+        stroke-dashoffset: 0;
+    }
+}
+
+/* One catch: rock down through five decreasing tilts, settle, flash twice, rest.
+   Amplitude comes from --tilt on the wrapper, because the right swing depends on how big the ball
+   is drawn: 14deg is lively at 80px and violent at 34rem. The fallback keeps the transform valid
+   if nobody sets it - an unresolvable calc() would kill the whole animation, not just the tilt. */
+@keyframes pokehub-wobble {
+    0%,
+    6% {
+        transform: rotate(0deg);
+    }
+    12% {
+        transform: rotate(calc(var(--tilt, 14deg) * -1));
+    }
+    20% {
+        transform: rotate(calc(var(--tilt, 14deg) * 0.8));
+    }
+    28% {
+        transform: rotate(calc(var(--tilt, 14deg) * -0.57));
+    }
+    36% {
+        transform: rotate(calc(var(--tilt, 14deg) * 0.36));
+    }
+    44% {
+        transform: rotate(calc(var(--tilt, 14deg) * -0.14));
+    }
+    50%,
+    100% {
+        transform: rotate(0deg);
+    }
+}
+
+@keyframes pokehub-catch {
+    0%,
+    54% {
+        fill: transparent;
+    }
+    60% {
+        fill: currentColor;
+    }
+    67% {
+        fill: transparent;
+    }
+    73% {
+        fill: currentColor;
+    }
+    80%,
+    100% {
+        fill: transparent;
+    }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+    .pokehub-ball__draw {
+        stroke-dashoffset: 1;
+        animation: pokehub-draw 0.7s ease forwards;
+    }
+    /* Stagger so it reads as being drawn: shell, then band, then button ring.
+       nth-CHILD, not nth-of-type: the shapes are circle/path/circle/circle, so
+       nth-of-type counts the circles and the paths in separate sequences and
+       the band never matches. */
+    .pokehub-ball__draw:nth-child(2) {
+        animation-delay: 0.3s;
+    }
+    .pokehub-ball__draw:nth-child(3) {
+        animation-delay: 0.5s;
+    }
+    /* starts after the drawing finishes */
+    .pokehub-ball svg {
+        animation: pokehub-wobble 4.5s cubic-bezier(0.36, 0.07, 0.19, 0.97) 1.3s infinite;
+    }
+    .pokehub-ball__btn {
+        animation: pokehub-catch 4.5s ease 1.3s infinite;
+    }
+}
+
+/* The same hairline ball, drawn in but standing still - what the panel corners want, where a
+   wobbling background decoration next to body copy is just a thing pulling the eye off the text.
+   Specificity (0,2,1) beats the no-preference block above, so source order does not matter. */
+.pokehub-ball.is-still svg,
+.pokehub-ball.is-still .pokehub-ball__btn {
+    animation: none;
+}

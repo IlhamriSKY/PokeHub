@@ -1,0 +1,43 @@
+# Admin-uploaded card art lives here. It is user-supplied content inside the document root, so
+# nothing in this tree may ever be executed as code - only served as a static image.
+#
+# The controller already derives the extension from the file's sniffed content rather than the
+# client's filename, which is what closes the "PNG bytes named x.php" RCE. This file is the second
+# lock: if that check is ever weakened or another upload path is added, execution still fails here.
+
+# Never hand these to an interpreter, whatever the extension chain says.
+<FilesMatch "\.(?i:php|php3|php4|php5|php7|php8|phtml|phar|pl|py|cgi|asp|aspx|jsp|sh|htaccess)$">
+    Require all denied
+</FilesMatch>
+
+# PHP off for this tree. Both halves of this used to 500 the whole directory, from opposite ends:
+#
+#   php_flag engine off        guarded by <IfModule mod_authz_core.c> - that is CORE Apache 2.4 and
+#                              always loaded, so on PHP-FPM the directive was emitted with no
+#                              mod_php to parse it: "Invalid command php_flag".
+#   php_admin_flag engine off  guarded by mod_php correctly, but php_admin_* is server-config only.
+#                              In a .htaccess Apache answers "php_admin_flag not allowed here" and
+#                              500s every asset under it - which it was doing.
+#
+# So: php_flag (the per-directory form, the only one legal here), guarded on mod_php itself.
+<IfModule mod_php.c>
+    php_flag engine off
+</IfModule>
+<IfModule mod_php7.c>
+    php_flag engine off
+</IfModule>
+<IfModule mod_php8.c>
+    php_flag engine off
+</IfModule>
+
+RemoveHandler .php .phtml .phar .cgi .pl .py
+RemoveType .php .phtml .phar
+
+# Serve as a download rather than letting the browser sniff anything executable, and stop
+# content-type guessing entirely.
+<IfModule mod_headers.c>
+    Header set X-Content-Type-Options "nosniff"
+    Header set Content-Security-Policy "default-src 'none'; img-src 'self'; style-src 'unsafe-inline'"
+</IfModule>
+
+Options -ExecCGI -Indexes

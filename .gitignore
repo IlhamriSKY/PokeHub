@@ -1,0 +1,30 @@
+.DS_Store
+.env
+.env.backup
+.env.production
+.phpactor.json
+.phpunit.result.cache
+/.claude
+/.fleet
+/.idea
+/.nova
+/.phpunit.cache
+/.vscode
+/.zed
+/bootstrap/ssr
+/node_modules
+/public/build
+/public/hot
+/public/storage
+/storage/*.key
+/storage/pail
+/vendor
+auth.json
+# Admin-uploaded card art: user content, not source. The .htaccess beside it IS source - it is the
+# lock that stops anything in this tree being executed, so a deploy without it is a live RCE hole.
+/public/img/uploads/*
+!/public/img/uploads/.htaccess
+Homestead.json
+Homestead.yaml
+npm-debug.log
+yarn-error.log

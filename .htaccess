@@ -1,0 +1,20 @@
+# PokeHub is a Laravel app; the real front controller is public/index.php.
+# Laragon (and most hosts) should point the document root at .../pokehub/public.
+# This root .htaccess is a fallback: if the document root is the PROJECT root
+# instead, forward every request into public/ so the app still works and nothing
+# outside public/ (.env, storage/, config) is ever served directly.
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # Don't rewrite requests that already target public/.
+    RewriteCond %{REQUEST_URI} !^/public/
+    RewriteRule ^(.*)$ public/$1 [L]
+</IfModule>
+
+# Defense in depth: never serve secrets or SQL even if the docroot is misconfigured.
+<FilesMatch "\.(env|sql)$">
+    Require all denied
+</FilesMatch>
+<FilesMatch "^config">
+    Require all denied
+</FilesMatch>
