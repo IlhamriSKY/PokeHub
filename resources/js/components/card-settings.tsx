@@ -25,6 +25,20 @@ const TCG_TYPE_LABEL: Record<string, string> = { lightning: 'Electric', metal: '
 // Upstream's DUAL TYPE list drops Dark. 1-gen ships no dark frame at all, so this only bites here.
 const DUAL_DROPS_DARK = new Set(['tcg-gen', 'scarlet-violet']);
 
+/**
+ * Can `slug` be this generation's SECOND type?
+ *
+ * Not the same question as `elementSupported`, which asks for a frame. A dual type only ever draws
+ * an energy disc beside the primary one, so upstream offers Fairy as a dual on Scarlet & Violet
+ * even though SV ships no Fairy frame. Measured on all three generations: 1-gen dual == its own 7
+ * types, tcg-gen 11 types -> 10 duals, SV 10 types -> 10 duals (minus Dark, plus Fairy). Deriving
+ * the list from the frame-gated one alone lost Fairy on SV, the single entry that differs.
+ */
+const dualSupported = (generation: string, slug: string): boolean =>
+    DUAL_DROPS_DARK.has(generation)
+        ? slug !== 'darkness' && (slug === 'fairy' || elementSupported(generation, slug))
+        : elementSupported(generation, slug);
+
 function Field({ label, children }: { label: string; children: ReactNode }) {
     return (
         <div className="space-y-1.5">
@@ -64,7 +78,7 @@ export function CardSettings({
     const genVariants = (options.variant ?? []).filter((v) => v.generation === a.generation);
     const elementOptions = elementsForGen(options.element ?? [], a.generation);
     const shownElement = pickerElement(a.generation, a.element, topLang);
-    const dualOptions = DUAL_DROPS_DARK.has(a.generation) ? elementOptions.filter((o) => o.slug !== 'darkness') : elementOptions;
+    const dualOptions = (options.element ?? []).filter((o) => dualSupported(a.generation, o.slug));
     const tagOptions = (options.tag ?? []).filter((o) => !(o.slug === 'mega' && (a.generation === '1-gen' || a.generation === 'tcg-gen')));
     const subtypeOptions = subtypesForGen(subtypesFromOptions(options), a.generation);
     const typeLabel = (o: { slug: string; label: string }) => (a.generation === 'tcg-gen' ? (TCG_TYPE_LABEL[o.slug] ?? o.label) : o.label);
@@ -87,7 +101,7 @@ export function CardSettings({
     const changeGeneration = (g: string) => {
         const next: Partial<Axes> = { generation: g, frame: 'none', variant: 'regular' };
         if (!elementSupported(g, a.element)) next.element = AUTO;
-        if (!elementSupported(g, a.dualType)) next.dualType = AUTO;
+        if (!dualSupported(g, a.dualType)) next.dualType = AUTO;
         if (!subtypeSupported(g, a.subtype)) next.subtype = AUTO;
         if (!supportsChrome(g)) {
             next.badge = 'none';
@@ -97,7 +111,6 @@ export function CardSettings({
         // "EDITION 1" is Base Set art; no other generation has it.
         if (g !== '1-gen') next.firstEdition = false;
         if (!attributeFramesForGen(g).length) next.attributeFrame = 'none';
-        if (DUAL_DROPS_DARK.has(g) && a.dualType === 'darkness') next.dualType = AUTO;
         if ((g === '1-gen' || g === 'tcg-gen') && a.tag === 'mega') next.tag = 'none';
         set(next);
     };

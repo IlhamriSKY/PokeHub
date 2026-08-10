@@ -39,7 +39,7 @@ const frameName = (gen: AssetGen, t: Element) => (framesFor(gen).has(BASE[t]) ? 
 // Prefer the raw element key when the gen ships that symbol (only `colorless` differs from its BASE
 // alias): the retreat cost must use the grey colorless energy, not `normal`, on tcg / sv. 1-gen has no
 // colorless symbol, so it still falls back through BASE['colorless']='normal'.
-const symbolName = (gen: AssetGen, t: Element) => (symbolsFor(gen).has(t) ? t : symbolsFor(gen).has(BASE[t]) ? BASE[t] : 'normal');
+const symbolName = (gen: AssetGen, t: Element) => (symbolsFor(gen).has(t) ? t : symbolsFor(gen).has(BASE[t]) ? BASE[t] : null);
 
 /**
  * Does this generation actually ship a frame for this element?
@@ -51,7 +51,24 @@ const symbolName = (gen: AssetGen, t: Element) => (symbolsFor(gen).has(t) ? t : 
  */
 export const elementHasFrame = (gen: AssetGen, element: string) => framesFor(gen).has(BASE[element as Element]);
 
-const energyUrl = (gen: AssetGen, t: Element) => `/img/pcg/${gen}/${symbolName(gen, t)}.webp`;
+/**
+ * The energy disc for `t`, borrowing from tcg-gen when this generation ships none.
+ *
+ * The old fallback was the string 'normal', which does not mean "no art" - it means COLORLESS. So
+ * a Metal card on Scarlet & Violet (a real, selectable type: `basic-steel.webp` exists, but
+ * `scarlet-violet/steel.webp` does not) printed a colourless disc in its header socket, and a
+ * Dragon or Fairy weakness on Base Set printed one in the weakness row. Wrong element beats
+ * missing element for nobody. tcg-gen is the only complete symbol set, and the reference borrows
+ * across generations the same way - it fetches `tcg-gen/water.webp` while rendering an SV card.
+ */
+const energyUrl = (gen: AssetGen, t: Element): string => {
+    for (const g of [gen, 'tcg-gen' as AssetGen]) {
+        const name = symbolName(g, t);
+        if (name) return `/img/pcg/${g}/${name}.webp`;
+    }
+
+    return `/img/pcg/${gen}/normal.webp`;
+};
 /**
  * 1st gen ships TWO frames per type: `<type>-basic.webp` and `<type>-stage.webp`. The stage
  * art bakes the gold sunburst pre-evolution box + the "evolves from" rule into the header.
