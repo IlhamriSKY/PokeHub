@@ -3,9 +3,9 @@ import { CardZoom } from '@/components/card-zoom';
 import LinePokeball from '@/components/line-pokeball';
 import { PokeCard } from '@/components/PokeCard';
 import { Button } from '@/components/ui/button';
-import { resolveOverrides, type Axes } from '@/lib/cardModel';
+import { autoDualType, resolveOverrides, type Axes } from '@/lib/cardModel';
 import { useCardOptions } from '@/lib/options';
-import { langColor, langType, raritiesFromOptions, rarityOf, type Profile } from '@/lib/rarities';
+import { langType, raritiesFromOptions, rarityOf, typeColor, type Profile } from '@/lib/rarities';
 import { type SharedData } from '@/types';
 import { Head, Link, usePage } from '@inertiajs/react';
 import { ArrowRight, Check, Download, Link2, Loader2, MapPin } from 'lucide-react';
@@ -130,11 +130,25 @@ export default function PublicCard({ owner, card }: { owner: { name: string; slu
     const mine = !!auth?.user?.github_login && auth.user.github_login.toLowerCase() === (profile.login || '').toLowerCase();
     const cta = ctaFor(!!auth?.user, mine, profile.login);
 
-    const accent = langColor(profile.top_lang);
-    // Read back from the resolved overrides rather than re-derived, so an admin-set element or
-    // dual type shows here as well as on the card face.
+    /*
+     * The page tints itself to whatever the card actually draws.
+     *
+     * Both halves have to be derived the same way PokeCard derives them. The dual type is the one
+     * that bites: `resolveOverrides` leaves it undefined for the 'auto' sentinel and the face falls
+     * back to the second language, so reading the override alone showed one badge beside a card
+     * that was visibly wearing two.
+     *
+     * The accent keys off the resolved element rather than the top language, since an admin-set
+     * type would otherwise leave the page one colour and the card another.
+     */
     const element = overrides.element ?? langType(profile.top_lang);
-    const elements = overrides.dualType && overrides.dualType !== element ? [element, overrides.dualType] : [element];
+    const dualElement = overrides.dualType ?? autoDualType(profile.langs, overrides.generation ?? '1-gen', element);
+    const elements = dualElement && dualElement !== element ? [element, dualElement] : [element];
+
+    const accent = typeColor(element);
+    // A dual card gets both colours: the second only tints, so the card still reads as its primary.
+    const accent2 = elements.length > 1 ? typeColor(dualElement) : null;
+    const edge = accent2 ? `color-mix(in oklab, ${accent} 62%, ${accent2})` : accent;
 
     const copyLink = () => {
         navigator.clipboard.writeText(window.location.href);
@@ -175,11 +189,17 @@ export default function PublicCard({ owner, card }: { owner: { name: string; slu
             <Head title={`${owner.name} - PokeHub`} />
 
             <div className="bg-background text-foreground relative min-h-screen overflow-hidden">
-                {/* One wash of the card's own energy colour, so the page feels like the card. */}
+                {/* A wash of the card's own energy colour, so the page feels like the card. A dual
+                    card gets one per element, leaning the way the card's diagonal split does:
+                    primary from the left, secondary from the right. */}
                 <div
                     aria-hidden="true"
                     className="pointer-events-none absolute inset-x-0 top-0 h-[420px] opacity-[0.14] blur-3xl"
-                    style={{ background: `radial-gradient(60% 60% at 50% 0%, ${accent}, transparent)` }}
+                    style={{
+                        background: accent2
+                            ? `radial-gradient(55% 60% at 28% 0%, ${accent}, transparent), radial-gradient(55% 60% at 72% 0%, ${accent2}, transparent)`
+                            : `radial-gradient(60% 60% at 50% 0%, ${accent}, transparent)`,
+                    }}
                 />
                 {/* The logo mark again, huge and faint, behind the card. */}
                 <AppLogoIcon
@@ -205,7 +225,7 @@ export default function PublicCard({ owner, card }: { owner: { name: string; slu
                         No overflow-hidden, and that is load-bearing: the card tilts in 3D
                         (usePointerTilt) and carries a drop shadow, both of which paint outside its
                         layout box, and there is less panel padding above it than the tilt needs. */}
-                    <div className="bg-card rounded-2xl border shadow-sm" style={{ borderColor: `color-mix(in oklab, ${accent} 45%, transparent)` }}>
+                    <div className="bg-card rounded-2xl border shadow-sm" style={{ borderColor: `color-mix(in oklab, ${edge} 45%, transparent)` }}>
                         {/* items-start: the card is far taller than the details beside it. */}
                         <div className="grid items-start gap-5 p-4 sm:grid-cols-[224px_1fr] sm:p-5">
                             {/* Uncapped on a phone, fixed-width beside the details from sm up. The

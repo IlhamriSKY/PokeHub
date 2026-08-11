@@ -239,6 +239,15 @@ const TYPE_COLOR: Record<string, string> = {
 export const langColor = (l?: string) => TYPE_COLOR[langType(l)] ?? TYPE_COLOR.colorless;
 
 /**
+ * The colour of an element the card has already resolved.
+ *
+ * `langColor` starts from a language, which is only the same answer while nothing has overridden
+ * the element. Anything tinting itself to match the card should key off the element it actually
+ * draws, or an admin-set type leaves the page one colour and the card another.
+ */
+export const typeColor = (e?: string) => TYPE_COLOR[e ?? ''] ?? TYPE_COLOR.colorless;
+
+/**
  * Weakness and resistance AMOUNTS. Fixed per generation, NOT per profile, because the real game
  * fixes them per era - every card in a set prints the same modifier:
  *
