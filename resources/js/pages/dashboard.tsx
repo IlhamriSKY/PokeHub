@@ -150,7 +150,7 @@ export default function Dashboard() {
                                             {profile.is_public ? 'Anyone with the link can see it.' : 'Only you can see it.'}
                                         </p>
                                     </div>
-                                    <Button variant="outline" size="sm" className="shrink-0" onClick={toggleVisibility}>
+                                    <Button variant="outline" className="shrink-0" onClick={toggleVisibility}>
                                         {profile.is_public ? <Eye className="mr-1.5 h-3.5 w-3.5" /> : <EyeOff className="mr-1.5 h-3.5 w-3.5" />}
                                         {profile.is_public ? 'Make private' : 'Make public'}
                                     </Button>
@@ -170,7 +170,7 @@ export default function Dashboard() {
                                             >
                                                 {publicUrl}
                                             </a>
-                                            <Button variant="ghost" size="sm" className="h-7 shrink-0 px-2" onClick={() => copy('url', publicUrl)}>
+                                            <Button variant="ghost" size="sm" className="shrink-0 px-2" onClick={() => copy('url', publicUrl)}>
                                                 {copied === 'url' ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
                                             </Button>
                                         </div>
@@ -190,7 +190,7 @@ export default function Dashboard() {
                                             <Button
                                                 variant="outline"
                                                 size="sm"
-                                                className="h-7 shrink-0 px-2 text-xs"
+                                                className="shrink-0 px-2 text-xs"
                                                 onClick={() => {
                                                     copy('svg', `[![PokeHub card](${publicUrl}.svg)](${publicUrl})`);
                                                     // Warm the capture. It is taken on the first request (3-5s), and
@@ -214,7 +214,7 @@ export default function Dashboard() {
                             <Button
                                 onClick={regenerate}
                                 disabled={busy || !profile.github_login || spent}
-                                className="h-auto min-h-10 w-full overflow-hidden py-2 text-sm leading-snug whitespace-nowrap"
+                                className="h-auto min-h-9 w-full overflow-hidden py-2 text-sm leading-snug whitespace-nowrap"
                             >
                                 {busy ? (
                                     <>

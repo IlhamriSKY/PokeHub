@@ -76,13 +76,13 @@ export default function AdminActivity({
                                         value={q}
                                         spellCheck={false}
                                         placeholder="Search description or who did it"
-                                        className="h-9 pl-9"
+                                        className="pl-9"
                                         onChange={(e) => setQ(e.target.value)}
                                     />
                                 </div>
 
                                 <Select value={log} onValueChange={setLog}>
-                                    <SelectTrigger className="h-9 w-[170px]">
+                                    <SelectTrigger className="w-full sm:w-[170px]">
                                         <SelectValue placeholder="All channels" />
                                     </SelectTrigger>
                                     <SelectContent>

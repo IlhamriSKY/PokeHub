@@ -75,7 +75,7 @@ export default function AdminLab({ targets, editing }: { targets: Target[]; edit
             <div className="flex w-full flex-col gap-4 p-4">
                 <div className="flex flex-wrap items-center gap-3">
                     <Select value={editing?.key ?? ''} onValueChange={pick}>
-                        <SelectTrigger className="h-9 w-[280px]">
+                        <SelectTrigger className="w-full sm:w-[280px]">
                             <SelectValue placeholder="Pick a card to restyle" />
                         </SelectTrigger>
                         <SelectContent>

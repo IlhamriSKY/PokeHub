@@ -136,7 +136,6 @@ export default function AdminCards({
                                     ].map((t) => (
                                         <Button
                                             key={t.label}
-                                            size="sm"
                                             variant={(filters.filter ?? null) === t.key ? 'default' : 'outline'}
                                             onClick={() =>
                                                 go({
@@ -162,7 +161,7 @@ export default function AdminCards({
                                             })
                                         }
                                     >
-                                        <SelectTrigger className="h-8 w-[170px]" aria-label="Filter by rarity">
+                                        <SelectTrigger className="w-full sm:w-[170px]" aria-label="Filter by rarity">
                                             <SelectValue placeholder="All rarities" />
                                         </SelectTrigger>
                                         <SelectContent>
@@ -258,7 +257,7 @@ export default function AdminCards({
                             <td className="text-muted-foreground p-3 text-xs whitespace-nowrap">{c.updated_at}</td>
                             <td className="p-2 pr-3">
                                 <div className="flex justify-end gap-1">
-                                    <Button asChild size="sm" variant="ghost" className="h-8">
+                                    <Button asChild size="sm" variant="ghost">
                                         <Link href={`/admin/lab?edit=${encodeURIComponent(c.key)}`}>
                                             <Wand2 className="mr-1 h-3.5 w-3.5" />
                                             Card lab
@@ -267,17 +266,17 @@ export default function AdminCards({
                                     {/* Moderation acts on a user row. A generated card has none: it is
                                         public because it is unclaimed, and there is no slug to release. */}
                                     {c.id === null ? null : c.is_public && c.slug ? (
-                                        <Button size="sm" variant="outline" className="h-8" onClick={() => moderate(c, 'unpublish')}>
+                                        <Button size="sm" variant="outline" onClick={() => moderate(c, 'unpublish')}>
                                             <EyeOff className="mr-1 h-3.5 w-3.5" />
                                             Unpublish
                                         </Button>
                                     ) : (
-                                        <Button size="sm" variant="ghost" className="h-8" disabled={!c.slug} onClick={() => moderate(c, 'publish')}>
+                                        <Button size="sm" variant="ghost" disabled={!c.slug} onClick={() => moderate(c, 'publish')}>
                                             Publish
                                         </Button>
                                     )}
                                     {c.id !== null && c.slug && (
-                                        <Button size="sm" variant="ghost" className="text-destructive h-8" onClick={() => moderate(c, 'clear_slug')}>
+                                        <Button size="sm" variant="ghost" className="text-destructive" onClick={() => moderate(c, 'clear_slug')}>
                                             Release slug
                                         </Button>
                                     )}

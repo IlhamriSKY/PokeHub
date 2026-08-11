@@ -185,7 +185,7 @@ export default function AdminAssets({ categories, assets }: { categories: string
                 )}
 
                 <Card ref={formRef}>
-                    <CardHeader className="flex flex-row items-center gap-2 space-y-0">
+                    <CardHeader className="flex flex-col gap-2 space-y-0 sm:flex-row sm:items-center">
                         <CardTitle className="text-sm">{form.id ? `Edit asset #${form.id}` : 'Add a card option'}</CardTitle>
                         {form.id && <Badge variant="secondary">{form.category}</Badge>}
                     </CardHeader>
@@ -193,7 +193,7 @@ export default function AdminAssets({ categories, assets }: { categories: string
                         <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-5">
                             <Field label="Category" error={errors.category}>
                                 <Select value={form.category} onValueChange={(v) => setForm({ ...form, category: v })}>
-                                    <SelectTrigger className="h-9">
+                                    <SelectTrigger>
                                         <SelectValue />
                                     </SelectTrigger>
                                     <SelectContent>
@@ -206,11 +206,10 @@ export default function AdminAssets({ categories, assets }: { categories: string
                                 </Select>
                             </Field>
                             <Field label="Slug *" error={errors.slug}>
-                                <Input className="h-9 font-mono" value={form.slug} onChange={(e) => setForm({ ...form, slug: e.target.value })} />
+                                <Input className="font-mono" value={form.slug} onChange={(e) => setForm({ ...form, slug: e.target.value })} />
                             </Field>
                             <Field label="Label" error={errors.label}>
                                 <Input
-                                    className="h-9"
                                     value={form.label}
                                     placeholder="defaults to the slug"
                                     onChange={(e) => setForm({ ...form, label: e.target.value })}
@@ -218,25 +217,19 @@ export default function AdminAssets({ categories, assets }: { categories: string
                             </Field>
                             <Field label="Generation" error={errors.generation}>
                                 <Input
-                                    className="h-9"
                                     value={form.generation}
                                     placeholder="blank = all"
                                     onChange={(e) => setForm({ ...form, generation: e.target.value })}
                                 />
                             </Field>
                             <Field label="Sort order" error={errors.sort_order}>
-                                <Input
-                                    className="h-9"
-                                    type="number"
-                                    value={form.sort_order}
-                                    onChange={(e) => setForm({ ...form, sort_order: +e.target.value })}
-                                />
+                                <Input type="number" value={form.sort_order} onChange={(e) => setForm({ ...form, sort_order: +e.target.value })} />
                             </Field>
 
                             <div className="sm:col-span-2 lg:col-span-3">
                                 <Field label="Asset URL (or upload below)" error={errors.asset_url}>
                                     <Input
-                                        className="h-9 font-mono text-xs"
+                                        className="font-mono text-xs"
                                         value={form.asset_url}
                                         placeholder="/img/uploads/frame/rainbow.webp"
                                         onChange={(e) => setForm({ ...form, asset_url: e.target.value })}
@@ -248,7 +241,6 @@ export default function AdminAssets({ categories, assets }: { categories: string
                                     so the picker must not advertise it either. */}
                                 <Field label="Upload (webp/png/jpg/gif, max 4MB)" error={errors.file}>
                                     <Input
-                                        className="h-9"
                                         type="file"
                                         accept="image/webp,image/png,image/jpeg,image/gif"
                                         onChange={(e) => setForm({ ...form, file: e.target.files?.[0] ?? null })}
@@ -258,7 +250,7 @@ export default function AdminAssets({ categories, assets }: { categories: string
                             <div className="sm:col-span-3 lg:col-span-5">
                                 <Field label="Meta (JSON, optional)" error={errors.meta}>
                                     <Input
-                                        className="h-9 font-mono text-xs"
+                                        className="font-mono text-xs"
                                         value={form.meta}
                                         placeholder='{"dr":"rare holo cosmos"}'
                                         onChange={(e) => setForm({ ...form, meta: e.target.value })}
@@ -301,7 +293,7 @@ export default function AdminAssets({ categories, assets }: { categories: string
                                     value={q}
                                     spellCheck={false}
                                     placeholder="Search slug, label or generation"
-                                    className="h-9 pl-9"
+                                    className="pl-9"
                                     onChange={(e) => {
                                         setQ(e.target.value);
                                         setPageNo(1);
@@ -316,7 +308,7 @@ export default function AdminAssets({ categories, assets }: { categories: string
                                     setPageNo(1);
                                 }}
                             >
-                                <SelectTrigger className="h-9 w-[170px] capitalize">
+                                <SelectTrigger className="w-full capitalize sm:w-[170px]">
                                     <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -336,7 +328,7 @@ export default function AdminAssets({ categories, assets }: { categories: string
                                     setPageNo(1);
                                 }}
                             >
-                                <SelectTrigger className="h-9 w-[140px]">
+                                <SelectTrigger className="w-full sm:w-[140px]">
                                     <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -408,17 +400,17 @@ export default function AdminAssets({ categories, assets }: { categories: string
                             </td>
                             <td className="p-2 pr-3 text-right">
                                 <div className="flex justify-end gap-1">
-                                    <Button size="sm" variant="outline" className="h-8" onClick={() => edit(a)}>
+                                    <Button size="sm" variant="outline" onClick={() => edit(a)}>
                                         <Pencil className="mr-1 h-3.5 w-3.5" />
                                         Edit
                                     </Button>
-                                    <Button size="sm" variant="ghost" className="h-8" onClick={() => toggle(a.id)}>
+                                    <Button size="sm" variant="ghost" onClick={() => toggle(a.id)}>
                                         {a.enabled ? 'Disable' : 'Enable'}
                                     </Button>
                                     <Button
                                         size="sm"
                                         variant="ghost"
-                                        className="text-destructive h-8 px-2"
+                                        className="text-destructive px-2"
                                         aria-label={`Delete ${a.category}/${a.slug}`}
                                         onClick={() => del(a)}
                                     >

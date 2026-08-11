@@ -16,11 +16,22 @@ const buttonVariants = cva(
                 ghost: 'hover:bg-accent hover:text-accent-foreground',
                 link: 'text-primary underline-offset-4 hover:underline',
             },
+            /*
+             * One height scale for every control in the app: `sm` (h-8) for actions inside a table
+             * row, the default (h-9) for anything standing in a form or a toolbar beside an Input
+             * or a Select, and `lg` (h-11) for a page's own call to action.
+             *
+             * The default was h-10 while Input and SelectTrigger were h-10 too, which sounds
+             * consistent and was not: the admin screens had already overridden themselves down to
+             * h-9 in a dozen places, so a toolbar could hold an h-10 search box, an h-9 filter tab
+             * and an h-8 dropdown in one row. Setting the scale here is what lets those overrides
+             * be deleted rather than added to.
+             */
             size: {
-                default: 'h-10 px-4 py-2',
-                sm: 'h-9 rounded-md px-3',
+                default: 'h-9 px-4 py-2',
+                sm: 'h-8 rounded-md px-3',
                 lg: 'h-11 rounded-md px-8',
-                icon: 'h-10 w-10',
+                icon: 'h-9 w-9',
             },
         },
         defaultVariants: {
