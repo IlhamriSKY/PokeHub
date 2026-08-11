@@ -35,12 +35,14 @@ export type CardOverrides = {
  * @param rarity      Rarity preset (holo effect + data-rarity for the foil engine).
  * @param onActivate  Called on click/Enter, e.g. to open the card in a zoom overlay.
  * @param active      Marks this instance as the enlarged/active copy.
+ * @param idle        Position in a group that tilts on its own, one card at a time.
  */
 export function PokeCard({
     profile: d,
     rarity,
     onActivate,
     active,
+    idle,
     element,
     subtype,
     dualType,
@@ -64,8 +66,10 @@ export function PokeCard({
     /** Called on click/Enter with the card's on-screen rect (the zoom origin). */
     onActivate?: (rect: DOMRect) => void;
     active?: boolean;
+    /** Omit for a card that only moves under the pointer. */
+    idle?: { index: number; count: number };
 } & CardOverrides) {
-    const ref = usePointerTilt<HTMLDivElement>();
+    const ref = usePointerTilt<HTMLDivElement>(idle);
     const type = element ?? langType(d.top_lang);
     const lore = loreOf(d);
     // Dual type: a distinct secondary element that splits the frame diagonally.

@@ -185,10 +185,20 @@ function ThemeSwitch() {
 }
 
 /** One showcase card, resolved the same way every other surface resolves one. */
-function ShowcaseCard({ entry, rarities, options }: { entry: ShowcaseEntry; rarities: Rarity[]; options: CardOptions }) {
+function ShowcaseCard({
+    entry,
+    rarities,
+    options,
+    idle,
+}: {
+    entry: ShowcaseEntry;
+    rarities: Rarity[];
+    options: CardOptions;
+    idle?: { index: number; count: number };
+}) {
     const rarity = rarityOf(rarities, entry.rarity);
 
-    return <PokeCard profile={entry.profile} rarity={rarity} {...resolveOverrides(options, entry.axes, rarity)} />;
+    return <PokeCard profile={entry.profile} rarity={rarity} idle={idle} {...resolveOverrides(options, entry.axes, rarity)} />;
 }
 
 /**
@@ -232,6 +242,7 @@ const HAND = [
 function FanCard({
     entry,
     index,
+    count,
     rarities,
     options,
     onZoom,
@@ -240,6 +251,8 @@ function FanCard({
 }: {
     entry: ShowcaseEntry;
     index: number;
+    /** How many cards share the idle rotation, so each one knows when its turn comes. */
+    count: number;
     rarities: Rarity[];
     options: CardOptions;
     onZoom: (e: ShowcaseEntry) => void;
@@ -262,7 +275,7 @@ function FanCard({
                 ...(fan && { rotate: fan.rotate, width: fan.width, marginTop: fan.lift, marginLeft: fan.overlap, zIndex: fan.z }),
             }}
         >
-            <ShowcaseCard entry={entry} rarities={rarities} options={options} />
+            <ShowcaseCard entry={entry} rarities={rarities} options={options} idle={{ index, count }} />
         </button>
     );
 }
@@ -293,6 +306,10 @@ export default function Landing({ showcase, showLogin, status }: { showcase: Sho
     const rarities = useMemo(() => raritiesFromOptions(options), [options]);
     const [zoom, setZoom] = useState<ShowcaseEntry | null>(null);
     const closeZoom = useCallback(() => setZoom(null), []);
+
+    // The gate and the hand both draw the same four cards, so they share one idle rotation and a
+    // card keeps its turn across the breakpoint.
+    const fanned = Math.min(showcase.length, 4);
 
     const signedIn = !!auth?.user;
     const ctaHref = signedIn ? '/dashboard' : '/login';
@@ -345,7 +362,16 @@ export default function Landing({ showcase, showLogin, status }: { showcase: Sho
                     <div className="grid items-center gap-8 xl:grid-cols-[1fr_minmax(0,40rem)_1fr]">
                         <div className="hidden items-center justify-end xl:flex">
                             {showcase.slice(0, 2).map((s, i) => (
-                                <FanCard key={s.login} entry={s} index={i} fan={FAN[i]} rarities={rarities} options={options} onZoom={setZoom} />
+                                <FanCard
+                                    key={s.login}
+                                    entry={s}
+                                    index={i}
+                                    count={fanned}
+                                    fan={FAN[i]}
+                                    rarities={rarities}
+                                    options={options}
+                                    onZoom={setZoom}
+                                />
                             ))}
                         </div>
 
@@ -385,6 +411,7 @@ export default function Landing({ showcase, showLogin, status }: { showcase: Sho
                                     key={s.login}
                                     entry={s}
                                     index={i + 2}
+                                    count={fanned}
                                     fan={FAN[i + 2]}
                                     rarities={rarities}
                                     options={options}
@@ -400,7 +427,16 @@ export default function Landing({ showcase, showLogin, status }: { showcase: Sho
                         before scrolling past the whole pitch. */}
                     <div className="mx-auto mt-12 flex w-full max-w-lg items-start justify-center xl:hidden">
                         {showcase.slice(0, 4).map((s, i) => (
-                            <FanCard key={s.login} entry={s} index={i} fan={HAND[i]} rarities={rarities} options={options} onZoom={setZoom} />
+                            <FanCard
+                                key={s.login}
+                                entry={s}
+                                index={i}
+                                count={fanned}
+                                fan={HAND[i]}
+                                rarities={rarities}
+                                options={options}
+                                onZoom={setZoom}
+                            />
                         ))}
                     </div>
                 </div>
