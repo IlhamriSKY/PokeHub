@@ -1,0 +1,69 @@
+name: Bug report
+description: Something renders wrong, errors, or does not behave as described.
+labels: ['bug']
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report. If this has a security impact, please do not file it here:
+        see [SECURITY.md](https://github.com/IlhamriSKY/PokeHub/blob/main/SECURITY.md) instead.
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What you saw, and what you expected instead.
+      placeholder: The weakness row prints two energy symbols instead of one.
+    validations:
+      required: true
+
+  - type: input
+    id: handle
+    attributes:
+      label: GitHub handle that reproduces it
+      description: >
+        Almost every bug here is a property of one profile's data, so the handle usually reproduces
+        it faster than any set of steps. Leave blank if it happens on every card.
+      placeholder: torvalds
+    validations:
+      required: false
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Search for the handle above
+        2. Open the card page
+        3. Look at the bottom row
+    validations:
+      required: false
+
+  - type: dropdown
+    id: where
+    attributes:
+      label: Where did you see it
+      options:
+        - The live site
+        - A local install
+        - A README embed (.svg / .gif / .png)
+    validations:
+      required: true
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Only needed for a local install.
+      placeholder: |
+        PHP 8.3, Node 22, MySQL 8.0, Firefox 133 on Windows 11
+    validations:
+      required: false
+
+  - type: textarea
+    id: extra
+    attributes:
+      label: Screenshot or error output
+      description: A screenshot of the card, or the relevant lines from `storage/logs/laravel.log`.
+    validations:
+      required: false

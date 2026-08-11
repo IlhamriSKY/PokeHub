@@ -1,13 +1,16 @@
 {
     "$schema": "https://getcomposer.org/schema.json",
-    "name": "laravel/react-starter-kit",
+    "name": "ilhamrisky/pokehub",
     "type": "project",
-    "description": "The skeleton application for the Laravel framework.",
+    "description": "Turn any public GitHub profile into a holographic Pokemon-style trading card.",
     "keywords": [
         "laravel",
-        "framework"
+        "inertia",
+        "react",
+        "github",
+        "pokemon"
     ],
-    "license": "MIT",
+    "license": "GPL-3.0-or-later",
     "require": {
         "php": "^8.2",
         "inertiajs/inertia-laravel": "^2.0",

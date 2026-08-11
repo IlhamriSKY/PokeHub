@@ -1,0 +1,46 @@
+name: Feature request
+description: Suggest something PokeHub should do.
+labels: ['enhancement']
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What is the problem
+      description: >
+        Describe the situation rather than the solution. What were you trying to do, and what got
+        in the way?
+      placeholder: I want my card in my README, but the animated version is too distracting.
+    validations:
+      required: true
+
+  - type: textarea
+    id: idea
+    attributes:
+      label: What would you like instead
+    validations:
+      required: false
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Which part of the project
+      options:
+        - Card rendering or layout
+        - Card generation (GitHub data or AI text)
+        - README images (.svg / .gif / .png)
+        - Dashboard or public card page
+        - Admin or card lab
+        - Deployment or configuration
+        - Something else
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: assets
+    attributes:
+      label: Assets
+      options:
+        - label: >
+            This does not require adding card artwork or fonts that the project has no right to
+            redistribute. See NOTICE.md.
+          required: true

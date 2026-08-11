@@ -2,26 +2,24 @@ name: tests
 
 on:
   push:
-    branches:
-      - develop
-      - main
+    branches: [main, develop]
   pull_request:
-    branches:
-      - develop
-      - main
+    branches: [main, develop]
+
+permissions:
+  contents: read
 
 jobs:
   ci:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
         with:
-          php-version: 8.4
+          php-version: '8.4'
           tools: composer:v2
           coverage: xdebug
 
@@ -31,23 +29,27 @@ jobs:
           node-version: '22'
           cache: 'npm'
 
-      - name: Install Node Dependencies
-        run: npm ci
+      - name: Install dependencies
+        run: |
+          composer install --no-interaction --prefer-dist --optimize-autoloader
+          npm ci
 
-      - name: Build Assets
+      # The Blade root view resolves the Vite manifest, so Inertia assertions need a real build.
+      - name: Build assets
         run: npm run build
 
-      - name: Create SQLite Database
-        run: touch database/database.sqlite
+      - name: Prepare environment
+        run: |
+          cp .env.example .env
+          php artisan key:generate
 
-      - name: Install Dependencies
-        run: composer install --no-interaction --prefer-dist --optimize-autoloader
-
-      - name: Copy Environment File
-        run: cp .env.example .env
-
-      - name: Generate Application Key
-        run: php artisan key:generate
-
+      # phpunit.xml pins the suite to an in-memory SQLite database, so nothing to provision.
       - name: Tests
-        run: ./vendor/bin/phpunit
+        run: php artisan test
+
+      # The card model has no test runner of its own. See docs/PARITY.md.
+      - name: Card model self-check
+        run: |
+          npx esbuild resources/js/lib/cardModel.check.ts --bundle --platform=node \
+            --alias:@=./resources/js --outfile=check.mjs --format=esm
+          node check.mjs

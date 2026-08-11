@@ -1,36 +1,55 @@
 /* =========================================================
-   Poke Card Generator authentic faces - real WebP frame assets
-   (downloaded from pokecardgenerator.com) with GitHub + AI content
-   overlaid. Fonts are the real Gill Sans / NeoGram / TCG-symbol set.
+   The card faces: real WebP frame assets with GitHub and AI content overlaid.
+
+   Card text is set in Gill Sans, which is a commercial typeface this project
+   cannot redistribute, so none of those files are in the repository. Each face
+   below lists Gill Sans first and Cabin second.
+
+   `src` is a prioritised list, and a browser skips any source it cannot load,
+   so the card renders in Cabin out of the box and switches to Gill Sans by
+   itself once someone drops their own licensed copies into /public/fonts/pcg.
+   Cabin was drawn after Eric Gill's typefaces and is close enough that the
+   measured layout in this file still holds. See public/fonts/pcg/README.md.
    ========================================================= */
 
 @font-face {
     font-family: 'PCG';
-    src: url('/fonts/pcg/GillSansStd.otf') format('opentype');
+    src:
+        url('/fonts/pcg/GillSansStd.otf') format('opentype'),
+        url('/fonts/cabin-3.woff2') format('woff2');
     font-weight: 400;
     font-display: swap;
 }
 @font-face {
     font-family: 'PCG';
-    src: url('/fonts/pcg/GillSansStdBold.otf') format('opentype');
+    src:
+        url('/fonts/pcg/GillSansStdBold.otf') format('opentype'),
+        url('/fonts/cabin-3.woff2') format('woff2');
     font-weight: 700;
     font-display: swap;
 }
 @font-face {
     font-family: 'PCG Cond';
-    src: url('/fonts/pcg/GillSansStd-BoldCondensed.otf') format('opentype');
+    src:
+        url('/fonts/pcg/GillSansStd-BoldCondensed.otf') format('opentype'),
+        url('/fonts/cabin-3.woff2') format('woff2');
     font-weight: 700;
     font-display: swap;
 }
 @font-face {
     font-family: 'PCG Nova';
-    src: url('/fonts/pcg/GillSansNova-Medium.ttf') format('truetype');
+    src:
+        url('/fonts/pcg/GillSansNova-Medium.ttf') format('truetype'),
+        url('/fonts/cabin-3.woff2') format('woff2');
     font-weight: 500;
     font-display: swap;
 }
+/* HP and damage numbers, always italic, hence the italic Cabin subset. */
 @font-face {
     font-family: 'PCG Num';
-    src: url('/fonts/pcg/NeoGramTrial-Heavyit.otf') format('opentype');
+    src:
+        url('/fonts/pcg/NeoGramTrial-Heavyit.otf') format('opentype'),
+        url('/fonts/cabin-4.woff2') format('woff2');
     font-display: swap;
 }
 
@@ -447,9 +466,9 @@
    while the HP still starts at 59.4% (PokeHub keeps HP left of the frame's baked emblem;
    pokecardgenerator runs it under the emblem and so has more room). At 5.4cqw the default
    "Linus Torvalds" reached 59.55% and touched "312k HP". */
-/* Only the LEFT anchor moves on a Stage card - the reference measures its Stage name at L27.21%
-   but on the very same baseline as Basic (ink bottom 10.50% in both), so the inherited `top`
-   above is correct here and the old per-stage override is gone. */
+/* Only the left anchor moves on a Stage card: the reference measures its Stage name at L27.21%
+   but on the same baseline as Basic (ink bottom 10.50% in both), so the inherited `top` above
+   already holds and no per-stage override is needed. */
 .gen-1-gen.is-stage .pcg-head {
     left: 27.4%;
 }
@@ -621,9 +640,9 @@
 .gen-tcg-gen.is-stage .pcg-evolve span {
     position: absolute;
     left: 21.5%;
-    /* Vertically CENTRED on the chrome's "evolves from" bar. Bar = asset y50-76 -> card
-       y8.61-11.18%, centre 9.89%. Measured line box is 1.72% tall, so top = 9.89 - 0.86 = 9.03%
-       lands it dead centre. It used to sit at 8.7% and read high. */
+    /* Vertically centred on the chrome's "evolves from" bar. The bar spans asset y50-76, which
+       is card y8.61-11.18%, so its centre is 9.89%. The measured line box is 1.72% tall, hence
+       top = 9.89 - 0.86 = 9.03%. */
     top: 9.03%;
     max-width: 37%;
     flex-direction: row;
@@ -688,10 +707,9 @@
     color: #1c1c1c;
     text-shadow: 0 1px 0 rgba(255, 255, 255, 0.4);
 }
-/* The type badge is BAKED into the frame at ~L88.4-94.8%, and (unlike before) we no longer
-   overlay an emblem here - so the HP has to stop short of it or "312k" runs into the disc.
-   With a dual type the two overlay badges start further left (primary at ~83.8%), so the HP
-   pulls back again. */
+/* The type badge is baked into the frame at roughly L88.4-94.8% and no emblem is overlaid here,
+   so the HP has to stop short of it or a long value runs into the disc. With a dual type the two
+   overlay badges start further left, at about 83.8%, so the HP pulls back again. */
 .gen-tcg-gen .pcg-topright {
     flex: none;
     gap: 1.2cqw;
@@ -957,18 +975,35 @@
    2.8cqw body size read as a footnote next to it. Same treatment tcg-gen already gives its "x2".
    line-height:1 first: with the inherited 1.5 the glyphs sat inside a line box half again their own
    height, and flex-centring that box left the INK 0.19% of card height above the disc's centre. */
+/* NO vertical nudge, and that is the measured answer rather than an omission.
+   This carried `position:relative; top:0.26em` to "drop the ink onto the band's centreline". It
+   pushed it 0.70% of card height BELOW the centreline instead - visible as the amount sitting low
+   against the lower silver rule. Two errors compounded:
+     1. `line-height: 1` already does the job. Half-leading centres the FONT box in the line box,
+        and "×2" has no descender to unbalance it: traced on the render, the ink spans 87.393-89.307%
+        while its own line box spans 86.986-89.716% - the two centres agree to 0.001%. So the premise
+        that the glyphs "hang in the top of their em box" was simply not true here, and any nudge at
+        all moves a correctly-centred thing off centre.
+     2. The band it was aimed at was 0.2% low. Tracing basic-psychic.webp down 8 clean columns puts
+        the silver rules' peaks at 85.577% and 89.327% OF THE FRAME FILE - but object-fit:fill draws
+        that 745x1040 frame 418.8px tall inside a 417.83px card, so frame percentages are stretched
+        by 418.8/417.83 = 1.00232 on the way in. Corrected: 85.776% and 89.534%, centre 87.655%.
+        That is where .pcg-wrr already centres its box (85.83% + 3.64%/2 = 87.65%) and where the
+        emblem already sits (measured centre 87.646%), which is why only the amount looked wrong.
+   Anyone re-checking this: scale the asset trace by frameHeight/pcgHeight before comparing, or you
+   will "fix" a band that is already correct.
+   The residual 0.06em is OPTICAL and was judged on a 6x render, not computed: geometrically the ink
+   box centres at 87.64% against the 87.655% centreline, but "x2" reads high there, because the
+   multiplication sign is a small mark sitting well above the baseline while the digit fills the
+   whole cap height - so the mass of the pair sits higher than the box that bounds it. 0.06em is
+   0.16% of card height, about half a pixel at the rendered size. Do not "correct" it back to zero
+   by measuring the box again; that is the measurement that produces the high-reading result. */
 .gen-scarlet-violet .pcg-wk-amt {
     font-size: 3.8cqw;
     font-weight: 700;
     line-height: 1;
-    /* Optical, not geometric, and measured on the INK rather than on the box.
-       Range.getBoundingClientRect returns the LINE box, so centring against it still left the
-       glyphs visibly high - the earlier 0.06em was calibrated on that lie. Scanning the rendered
-       pixels instead: with the row centred, the "2" ink centred 0.56% of card height ABOVE it,
-       because "×2" carries no descender and hangs in the top of its em box. At 3.8cqw (2.85% of
-       card height) that gap is 0.196em, so 0.26em total drops the ink onto the band's centreline. */
     position: relative;
-    top: 0.26em;
+    top: 0.06em;
 }
 /* Dex band measured on the reference: y48.16-49.21%, centre 48.69%.
    This box is NOT flex-centred, whatever the previous comment here claimed - it is display:block
@@ -1092,8 +1127,9 @@
     width: auto;
     object-fit: contain;
 }
-/* 5.2cqw ~= the height the six badge-shaped tags already had at the old width:17.5cqw
-   (they ranged 4.90-5.83cqw), so they are unchanged to the eye; mega goes 2.57 -> 5.2cqw. */
+/* 5.2cqw is about the height the six badge-shaped tags render at anyway (they range
+   4.90-5.83cqw), so sizing on height leaves them unchanged to the eye while lifting mega,
+   which is much wider than it is tall, to match. */
 .gen-1-gen .pcg-tag {
     top: 13.6%;
     right: 13.5%;

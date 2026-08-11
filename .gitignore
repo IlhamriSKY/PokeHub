@@ -20,10 +20,14 @@
 /storage/pail
 /vendor
 auth.json
-# Admin-uploaded card art: user content, not source. The .htaccess beside it IS source - it is the
-# lock that stops anything in this tree being executed, so a deploy without it is a live RCE hole.
+# Admin-uploaded card art: user content, not source. The .htaccess beside it IS source, since it is
+# the lock that stops anything in this tree being executed, so a deploy without it is an RCE hole.
 /public/img/uploads/*
 !/public/img/uploads/.htaccess
+# Gill Sans and NeoGram are commercial typefaces this project has no right to redistribute. The
+# card falls back to Cabin without them; drop your own licensed copies here for exact parity.
+/public/fonts/pcg/*
+!/public/fonts/pcg/README.md
 Homestead.json
 Homestead.yaml
 npm-debug.log

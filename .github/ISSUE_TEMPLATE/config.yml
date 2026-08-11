@@ -1,0 +1,22 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Take my card down
+    url: https://pokehub.ilhamriski.com/login
+    about: >
+      You do not need an issue for this. Sign in with that GitHub account and use the visibility
+      switch in your dashboard. The page, the gallery entry and the README images stop answering
+      immediately.
+
+  - name: Report a security vulnerability
+    url: https://github.com/IlhamriSKY/PokeHub/security/advisories/new
+    about: Report privately instead of opening a public issue.
+
+  - name: Asset takedown or attribution
+    url: https://github.com/IlhamriSKY/PokeHub/blob/main/NOTICE.md
+    about: >
+      If you own artwork, a typeface or code used here and would rather it were not, read NOTICE.md
+      and get in touch. It will be removed.
+
+  - name: Question or idea
+    url: https://github.com/IlhamriSKY/PokeHub/discussions
+    about: For anything that is not a bug report or a concrete feature request.
