@@ -62,15 +62,27 @@ class AdminEntryTest extends TestCase
     }
 
     /**
-     * The card list pulls its columns out of the `card` JSON in SQL, and the JSON functions differ
-     * between drivers. Hand-written MySQL here fails on any other connection.
+     * Each row carries the card itself, because it draws a thumbnail: the public image route 404s
+     * on exactly the private cards this page exists to moderate. The stat columns are read off
+     * that same blob rather than extracted again in SQL, so this pins both halves at once.
      */
-    public function test_the_card_list_reads_its_json_columns_on_any_driver()
+    public function test_the_card_list_ships_a_card_to_draw_and_stats_that_match_it()
     {
         User::factory()->create([
             'slug' => 'ash',
             'github_login' => 'ash',
-            'card' => ['rarity' => 'secret', 'profile' => ['login' => 'ash', 'followers' => 12, 'stars' => 34]],
+            'is_public' => false,
+            'card' => [
+                'rarity' => 'secret',
+                'axes' => ['generation' => 'tcg-gen'],
+                'profile' => [
+                    'login' => 'ash',
+                    'name' => 'Ash',
+                    'followers' => 12,
+                    'stars' => 34,
+                    'top_repos' => [['name' => 'never drawn']],
+                ],
+            ],
         ]);
 
         $this->actingAs($this->admin())
@@ -80,7 +92,12 @@ class AdminEntryTest extends TestCase
                 ->where('cards.data.0.rarity', 'secret')
                 ->where('cards.data.0.github', 'ash')
                 ->where('cards.data.0.followers', 12)
-                ->where('cards.data.0.stars', 34));
+                ->where('cards.data.0.stars', 34)
+                // Enough for the face to render, even though the card is private.
+                ->where('cards.data.0.card.profile.login', 'ash')
+                ->where('cards.data.0.card.rarity', 'secret')
+                // Still trimmed of what the face never prints.
+                ->missing('cards.data.0.card.profile.top_repos'));
     }
 
     public function test_admin_index_route_name_still_resolves_to_admin()
