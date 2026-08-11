@@ -86,9 +86,19 @@ export function PokeCard({
     // real spread. Language count cannot drive it, since the stored list is capped at three.
     const retreat = d.repos >= 200 ? 4 : d.repos >= 75 ? 3 : d.repos >= 25 ? 2 : 1;
 
-    // subtype -> visible stage label + a form suffix on the name.
-    const st = subtype ?? rarity.sub ?? 'basic';
-    const stageLabel = ['supporter', 'item', 'stadium'].includes(st)
+    /*
+     * subtype -> visible stage label + a form suffix on the name.
+     *
+     * A preset may carry a trainer subtype of its own (the Trainer Full Art one is a Supporter),
+     * and that is only meaningful on a card actually drawn as a Trainer. Letting it through on a
+     * Pokemon face labelled the card "Supporter" while it still printed HP, attacks and a retreat
+     * cost, which is a card that could not exist. The axis still wins when it names one outright,
+     * so the lab can draw a real Trainer.
+     */
+    const TRAINER_SUBTYPES = ['supporter', 'item', 'stadium'];
+    const presetSub = rarity.sub && !TRAINER_SUBTYPES.includes(rarity.sub) ? rarity.sub : undefined;
+    const st = subtype ?? presetSub ?? 'basic';
+    const stageLabel = TRAINER_SUBTYPES.includes(st)
         ? st.charAt(0).toUpperCase() + st.slice(1)
         : st === 'stage1'
           ? 'Stage 1'

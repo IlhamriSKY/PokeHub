@@ -35,13 +35,25 @@ return [
     // the floor for when there is no profile to score.
     'default_rarity' => env('POKEHUB_DEFAULT_RARITY', 'common'),
 
-    // Presets the automatic picker must never hand out, though they stay valid choices in the lab.
-    // Not taste - each breaks on an arbitrary profile:
-    //  - trainer: supertype "trainer", so the card renders a Trainer face with NO attacks.
-    //  - pokeball / masterball: --viewport-edge-clip is hardcoded to the 151 frame's geometry, so
-    //    the pattern clips against the wrong artwork window on 1-gen and tcg frames.
-    //  - pika*: bespoke cards keyed to one real Pikachu print's set + number.
-    'rarity_auto_exclude' => ['trainer', 'pokeball', 'masterball', 'pika020', 'pika145', 'pika160'],
+    /*
+     * Presets the automatic picker may not hand out. Empty, so every preset in the table is
+     * reachable and a pull is worth looking at.
+     *
+     * Six used to sit here because each broke on an arbitrary profile. All six were fixed rather
+     * than left excluded:
+     *  - pokeball / masterball drew their pattern against the 151 frame's window wherever the card
+     *    was, so it crossed the artwork on the other frames. The window is now per generation, off
+     *    the same measurements the photo box uses (pcg.css, end of file).
+     *  - trainer carries a Supporter subtype, which labelled a Pokemon face as a Trainer while it
+     *    still printed HP and attacks. A preset's trainer subtype is now ignored unless the card is
+     *    actually drawn as one (PokeCard).
+     *  - pika* are keyed to a real print's set and number, but those only select a foil recipe in
+     *    holo.css. Nothing about that print reaches the card, so they are simply three more foils.
+     *
+     * Kept as a hook: a preset that turns out to misbehave can be pulled from the roll here without
+     * losing it from the lab.
+     */
+    'rarity_auto_exclude' => [],
 
     // Explicit per-login override, which beats the derived tier. The landing showcase does NOT
     // live here any more - each showcase card carries its own rarity in the `showcase_cards`
