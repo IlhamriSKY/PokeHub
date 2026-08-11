@@ -145,10 +145,9 @@ export default function PublicCard({ owner, card }: { owner: { name: string; slu
     const dualElement = overrides.dualType ?? autoDualType(profile.langs, overrides.generation ?? '1-gen', element);
     const elements = dualElement && dualElement !== element ? [element, dualElement] : [element];
 
-    // The card's element, and only that. The ambient behind it stays one colour even when the card
-    // is dual, so the page reads as the type it leads with rather than as a gradient of two.
     const accent = typeColor(element);
-    // The panel edge still carries a hint of the second, with the primary leading.
+    // Null on a single-typed card, which is what makes the ambient fall back to one flat colour
+    // and the panel edge stay unblended.
     const accent2 = elements.length > 1 ? typeColor(dualElement) : null;
     const edge = accent2 ? `color-mix(in oklab, ${accent} 62%, ${accent2})` : accent;
 
@@ -191,11 +190,12 @@ export default function PublicCard({ owner, card }: { owner: { name: string; slu
             <Head title={`${owner.name} - PokeHub`} />
 
             <div className="bg-background text-foreground relative min-h-screen overflow-hidden">
-                {/* One wash of the card's element, so the page feels like the card. */}
+                {/* The card's elements, top to bottom: primary above, secondary below. A single
+                    type gives both ends the same colour, so it reads as one flat wash. */}
                 <div
                     aria-hidden="true"
                     className="pointer-events-none absolute inset-x-0 top-0 h-[420px] opacity-[0.14] blur-3xl"
-                    style={{ background: `radial-gradient(60% 60% at 50% 0%, ${accent}, transparent)` }}
+                    style={{ background: `linear-gradient(180deg, ${accent} 0%, ${accent2 ?? accent} 100%)` }}
                 />
                 {/* The logo mark again, huge and faint, behind the card. */}
                 <AppLogoIcon
