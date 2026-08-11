@@ -66,8 +66,11 @@ export default function Cards({ cards, q, rarity, showcase = [] }: { cards: Pagi
             router.get(
                 '/cards',
                 { ...(term ? { q: term } : {}), ...(tier !== ALL ? { rarity: tier } : {}) },
-                // Partial reload: skips recomputing the shared auth/permission props.
-                { preserveState: true, replace: true, only: ['cards', 'q', 'rarity'] },
+                // Partial reload: skips recomputing the shared auth/permission props. `showcase`
+                // MUST be in the list even though it looks like a constant - it is filtered by the
+                // same query, and leaving it out meant the first page kept the four homepage cards
+                // from the initial load no matter what you typed.
+                { preserveState: true, replace: true, only: ['cards', 'q', 'rarity', 'showcase'] },
             );
         }, 300);
 

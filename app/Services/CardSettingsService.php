@@ -40,7 +40,32 @@ class CardSettingsService
                 'group' => 'Users',
             ]);
 
-        return $showcase->concat($users)->values()->all();
+        // Cards someone generated from the home page without signing in. They live in `profiles`
+        // and belong to nobody, so nothing else in the panel could reach them - the lab could
+        // restyle a claimed card and a homepage card but not the ones the site actually produces
+        // most of. Showcase logins are excluded: those are the same profile row seen through a
+        // ShowcaseCard, and listing both would offer two handles for one card.
+        $claimed = User::whereNotNull('github_login')->pluck('github_login')->map('strtolower');
+        $onShow = ShowcaseCard::pluck('login')->map('strtolower');
+
+        $generated = Profile::query()
+            ->orderBy('login')
+            ->get()
+            ->reject(fn (Profile $p) => $claimed->contains(strtolower($p->login)) || $onShow->contains(strtolower($p->login)))
+            ->map(function (Profile $p) {
+                [$github] = $p->split();
+
+                return is_array($github) && ! empty($github['login']) ? [
+                    'key' => "profile:{$p->login}",
+                    'label' => ($github['name'] ?? '') !== '' ? $github['name'] : $github['login'],
+                    'sub' => '@'.$github['login'],
+                    'group' => 'Generated',
+                ] : null;
+            })
+            ->filter()
+            ->values();
+
+        return $showcase->concat($users)->concat($generated)->values()->all();
     }
 
     /** Resolve a "type:id" handle into a renderable card, or null when it names nothing. */
@@ -90,6 +115,26 @@ class CardSettingsService
                     'axes' => (object) ($row->card['axes'] ?? []),
                 ],
                 'text' => $this->text($row->card['profile']['name'] ?? '', $row->card['profile']['ai'] ?? null),
+            ];
+        }
+
+        if ($type === 'profile' && $id) {
+            $row = Profile::find(strtolower($id));
+            [$github, $card] = $row?->split() ?? [null, null];
+            if (! is_array($github) || empty($github['login'])) {
+                return null;
+            }
+
+            return [
+                'key' => $key,
+                'label' => ($github['name'] ?? '') !== '' ? $github['name'] : $github['login'],
+                'sub' => '@'.$github['login'],
+                'card' => [
+                    'profile' => $github + ['ai' => $card['ai'] ?? null],
+                    'rarity' => $card['rarity'] ?? config('pokehub.default_rarity', 'common'),
+                    'axes' => (object) ($card['axes'] ?? []),
+                ],
+                'text' => $this->text($github['name'] ?? '', $card['ai'] ?? null),
             ];
         }
 
@@ -184,6 +229,32 @@ class CardSettingsService
             }
             $row->card = $card;
             $row->save();
+
+            return true;
+        }
+
+        if ($type === 'profile' && $id) {
+            $row = Profile::find(strtolower($id));
+            [$github, $card] = $row?->split() ?? [null, null];
+            if (! is_array($github) || empty($github['login'])) {
+                return false;
+            }
+
+            $card = (array) $card;
+            $card['axes'] = $axes;
+            $card['rarity'] = $rarity;
+            if ($text) {
+                // The prose lives on the profile's own github_json/card_json, the same split the
+                // showcase branch above writes through - a generated card has no user row to hold
+                // it, and rewriting it here is what makes the lab's text fields do anything.
+                $card['ai'] = $this->mergeLore($card['ai'] ?? null, $text);
+                $github['name'] = $text['name'];
+            }
+            $row->update(['github_json' => $github, 'card_json' => $card]);
+
+            // A generated login can also be a showcase card's source row, so the homepage may be
+            // rendering exactly what just changed.
+            Cache::forget(LandingController::CACHE_KEY);
 
             return true;
         }

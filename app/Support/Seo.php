@@ -2,6 +2,8 @@
 
 namespace App\Support;
 
+use App\Services\CardCapture;
+
 /**
  * The per-page metadata that app.blade.php prints into <head>.
  *
@@ -13,10 +15,17 @@ namespace App\Support;
  */
 class Seo
 {
-    /** Card renders are portrait. */
-    public const CARD_W = 354;
+    /**
+     * The size of the still a card page advertises as its og:image.
+     *
+     * Taken from CardCapture rather than written out again. These were a pair of literals that
+     * went stale the moment the capture's output width changed: the page kept promising a 354x472
+     * image while the file on disk was 760x1058, and a scraper that trusts the tag and gets a
+     * different aspect back letterboxes the preview - bands down the sides of every share.
+     */
+    public const CARD_W = CardCapture::STILL_WIDTH;
 
-    public const CARD_H = 472;
+    public const CARD_H = CardCapture::STILL_HEIGHT;
 
     /**
      * @param  array<string, mixed>  $overrides

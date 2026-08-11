@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem, type SharedData } from '@/types';
-import { Head, router, usePage } from '@inertiajs/react';
+import { Head, Link, router, usePage } from '@inertiajs/react';
 import { EyeOff, Search } from 'lucide-react';
 import { useState } from 'react';
 
@@ -15,7 +15,9 @@ const breadcrumbs: BreadcrumbItem[] = [
 ];
 
 type CardRow = {
-    id: number;
+    /** "user:12" or "profile:torvalds". Null `id` means the second kind: nobody owns it. */
+    key: string;
+    id: number | null;
     name: string;
     slug: string | null;
     is_public: boolean;
@@ -129,7 +131,7 @@ export default function AdminCards({
                     footer={<Pagination page={cards} />}
                 >
                     {cards.data.map((c) => (
-                        <Row key={c.id}>
+                        <Row key={c.key}>
                             <td className="p-3">
                                 <div className="flex items-center gap-2">
                                     {c.avatar && <img src={c.avatar} alt="" className="h-7 w-7 rounded-full" loading="lazy" />}
@@ -168,7 +170,12 @@ export default function AdminCards({
                             <td className="text-muted-foreground p-3 text-xs whitespace-nowrap">{c.updated_at}</td>
                             <td className="p-2 pr-3">
                                 <div className="flex justify-end gap-1">
-                                    {c.is_public && c.slug ? (
+                                    <Button asChild size="sm" variant="ghost" className="h-8">
+                                        <Link href={`/admin/lab?edit=${encodeURIComponent(c.key)}`}>Edit</Link>
+                                    </Button>
+                                    {/* Moderation acts on a user row. A generated card has none: it is
+                                        public because it is unclaimed, and there is no slug to release. */}
+                                    {c.id === null ? null : c.is_public && c.slug ? (
                                         <Button size="sm" variant="outline" className="h-8" onClick={() => moderate(c, 'unpublish')}>
                                             <EyeOff className="mr-1 h-3.5 w-3.5" />
                                             Unpublish
@@ -178,7 +185,7 @@ export default function AdminCards({
                                             Publish
                                         </Button>
                                     )}
-                                    {c.slug && (
+                                    {c.id !== null && c.slug && (
                                         <Button size="sm" variant="ghost" className="text-destructive h-8" onClick={() => moderate(c, 'clear_slug')}>
                                             Release slug
                                         </Button>

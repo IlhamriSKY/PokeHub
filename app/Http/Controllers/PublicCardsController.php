@@ -3,8 +3,10 @@
 namespace App\Http\Controllers;
 
 use App\Models\User;
+use App\Support\GeneratedCards;
 use App\Support\Seo;
 use Illuminate\Http\Request;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Inertia\Inertia;
 
 class PublicCardsController extends Controller
@@ -14,7 +16,7 @@ class PublicCardsController extends Controller
         $q = trim((string) $request->query('q', ''));
         $rarity = trim((string) $request->query('rarity', ''));
 
-        $cards = User::query()
+        $claimed = User::query()
             ->select(['id', 'name', 'slug', 'github_login', 'card'])
             ->where('is_public', true)
             ->whereNotNull('slug')
@@ -28,14 +30,39 @@ class PublicCardsController extends Controller
             })
             ->when($rarity !== '', fn ($query) => $query->where('card->rarity', $rarity))
             ->orderBy('name')
-            ->paginate(10)
-            ->withQueryString()
-            ->through(fn (User $u) => [
+            ->get()
+            ->map(fn (User $u) => [
                 'name' => $u->name,
                 'slug' => $u->slug,
                 'github_login' => $u->github_login,
                 'card' => $u->card,
             ]);
+
+        /*
+         * Plus every card generated from the home page by someone who never signed in. Those are
+         * real, public, linkable cards at /{login} - the gallery simply never looked at the table
+         * they live in, so the only thing anyone could find here was the handful of claimed
+         * accounts and the four homepage cards.
+         *
+         * Claimed accounts stay first: they are somebody's own page and they are the ones that can
+         * be kept private, so they are the answer a search is most likely after.
+         */
+        $rows = $claimed->concat(GeneratedCards::all($q, $rarity)->map(fn (array $g) => [
+            'name' => $g['name'],
+            'slug' => $g['slug'],
+            'github_login' => $g['github_login'],
+            'card' => $g['card'],
+        ]));
+
+        $page = LengthAwarePaginator::resolveCurrentPage();
+        $cards = new LengthAwarePaginator(
+            $rows->forPage($page, 10)->values(),
+            $rows->count(),
+            10,
+            $page,
+            ['path' => LengthAwarePaginator::resolveCurrentPath()]
+        );
+        $cards->withQueryString();
 
         return Inertia::render('cards', [
             'cards' => $cards,

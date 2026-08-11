@@ -23,6 +23,7 @@ const { PNG } = pngjs;
 
 const [url, out, framesArg, widthArg, delayArg] = process.argv.slice(2);
 const WIDTH = Number(widthArg) || 320;
+
 const DELAY = Number(delayArg) || 90;
 const IS_SVG = /\.svg$/i.test(out ?? '');
 // PNG is the SVG's own still, unwrapped: the same single shot and downscale, written straight out
@@ -31,6 +32,19 @@ const IS_SVG = /\.svg$/i.test(out ?? '');
 const IS_PNG = /\.png$/i.test(out ?? '');
 const STILL = IS_SVG || IS_PNG;
 const FRAMES = STILL ? 1 : Number(framesArg) || 24;
+
+/**
+ * The width the card is FORCED to on the page before any shot is taken, in CSS px.
+ *
+ * Pinned here rather than inherited from the page so the output is a property of this script and
+ * not of whatever the card page's layout happens to be this week. At deviceScaleFactor 2 the raw
+ * capture is 1520px across, which box-averages cleanly to a 760px still - a real card is 63mm
+ * wide, so that is the 300dpi print size.
+ *
+ * The GIF renders small instead. It is 24 paints of a full holo card, and driving that at print
+ * size took the capture from 15 seconds to 74 for frames nobody views at more than thumbnail size.
+ */
+const RENDER_W = STILL ? 760 : 320;
 
 if (!url || !out) {
     console.error('usage: capture-card.mjs <url> <out.gif|out.svg|out.png> [frames] [width] [delayMs]');
@@ -68,7 +82,7 @@ try {
     // this the surrounding page bleeds into the edges of every shot. Hidden rather than removed,
     // because the card's ancestors have to stay visible and the pointer-tilt listeners are bound
     // to nodes that must not move.
-    await page.evaluate(() => {
+    await page.evaluate((RENDER_W, STILL) => {
         const card = document.querySelector('.card');
         const ancestors = [];
         for (let n = card; n; n = n.parentElement) ancestors.push(n);
@@ -87,7 +101,31 @@ try {
         for (const el of ancestors) {
             if (el !== card) el.style.background = 'transparent';
         }
-    });
+
+        /*
+         * Render at a FIXED width rather than whatever the page happens to lay the card out at.
+         * The output used to inherit that width, so a change to the card page's design silently
+         * changed every stored image: a layout edit took the card from 300px to 225px and the
+         * downloads went with it, at which point the still was a 266px-wide bitmap being handed
+         * out as a card.
+         *
+         * `.card` is width:100%, so the parent is what decides. RENDER_W is CSS px and the shot is
+         * taken at deviceScaleFactor 2, so the raw capture is twice this before it is averaged
+         * down to the requested output width.
+         */
+        const holder = card.parentElement;
+        holder.style.width = RENDER_W + 'px';
+        holder.style.maxWidth = 'none';
+
+        // The still has no tilt (see the quarter-lap note below), so it is clipped tight to the
+        // card and there is no room for a shadow to fall into. Cutting one off mid-blur leaves a
+        // grey smear down two edges; the download is meant to be the card and nothing else.
+        if (STILL) {
+            const s = document.createElement('style');
+            s.textContent = '.card__rotator{box-shadow:none !important}';
+            document.head.appendChild(s);
+        }
+    }, RENDER_W, STILL);
 
     const card = await page.$('.card');
     const box = await card.boundingBox();
@@ -97,7 +135,10 @@ try {
     // The padding is a share of the card's width rather than a flat pixel count. The box is
     // measured at rest, but the tilt swings the corners outside it, and scaling with the card
     // keeps the margin sufficient at any render size.
-    const pad = Math.ceil(box.width * 0.09);
+    // Only the GIF needs room: its pointer walk swings the card's corners outside the box it was
+    // measured at. The still is shot with the pointer dead centre, where the rotation is zero, so
+    // it is clipped to the card exactly - no transparent margin around the download.
+    const pad = STILL ? 0 : Math.ceil(box.width * 0.09);
     const clip = {
         x: Math.max(0, Math.round(box.x - pad)),
         y: Math.max(0, Math.round(box.y - pad)),

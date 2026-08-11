@@ -7,7 +7,10 @@ use App\Models\Profile;
 use App\Models\User;
 use App\Services\AvatarCache;
 use App\Services\CardSettingsService;
+use App\Support\GeneratedCards;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
@@ -212,9 +215,8 @@ class AdminController extends Controller
                 ->orWhere('slug', 'like', "%{$search}%")
                 ->orWhere('github_login', 'like', "%{$search}%")))
             ->orderByDesc('updated_at')
-            ->paginate(10)
-            ->withQueryString()
-            ->through(fn (User $u) => [
+            ->get()
+            ->map(fn (User $u) => [
                 'id' => $u->id,
                 'name' => $u->name,
                 'slug' => $u->slug,
@@ -225,14 +227,53 @@ class AdminController extends Controller
                 'followers' => $u->followers !== null ? (int) $u->followers : null,
                 'stars' => $u->stars !== null ? (int) $u->stars : null,
                 'updated_at' => $u->updated_at?->diffForHumans(),
+                'key' => "user:{$u->id}",
             ]);
+
+        /*
+         * Cards generated from the home page by visitors who never signed in (GeneratedCards).
+         * They are the bulk of what the site produces and had no row here at all, so an admin
+         * could not see them, let alone open one in the lab.
+         *
+         * Merged in PHP and paginated by hand rather than UNIONed: the two live in different
+         * tables with different shapes, and one of the columns this page sorts and filters on
+         * (rarity) is inside a JSON blob on one side and a column on the other. The `private`
+         * filter excludes them, since an unclaimed card is public by definition.
+         */
+        $rows = $only === 'private'
+            ? $cards
+            : $cards->concat(GeneratedCards::all($search)->map(fn (array $g) => [
+                'id' => null,
+                'name' => $g['name'],
+                'slug' => $g['slug'],
+                'is_public' => true,
+                'avatar' => AvatarCache::urlFor($g['github_login'], $g['avatar'], 96),
+                'github' => $g['github_login'],
+                'rarity' => $g['rarity'],
+                'followers' => $g['followers'],
+                'stars' => $g['stars'],
+                'updated_at' => Carbon::createFromTimestamp($g['fetched_at'])->diffForHumans(),
+                'key' => $g['key'],
+            ]));
+
+        $page = LengthAwarePaginator::resolveCurrentPage();
+        $cards = new LengthAwarePaginator(
+            $rows->forPage($page, 10)->values(),
+            $rows->count(),
+            10,
+            $page,
+            ['path' => LengthAwarePaginator::resolveCurrentPath()]
+        );
+        $cards->withQueryString();
 
         return Inertia::render('admin/cards', [
             'cards' => $cards,
             'filters' => ['q' => $search, 'filter' => $only],
+            // Counted across both sources, or the tab labels contradict the table under them.
             'totals' => [
-                'all' => User::whereNotNull('card')->count(),
-                'public' => User::whereNotNull('card')->where('is_public', true)->whereNotNull('slug')->count(),
+                'all' => User::whereNotNull('card')->count() + GeneratedCards::all()->count(),
+                'public' => User::whereNotNull('card')->where('is_public', true)->whereNotNull('slug')->count()
+                    + GeneratedCards::all()->count(),
             ],
         ]);
     }

@@ -96,10 +96,12 @@ class PublicCardLookup
             ],
             'card' => [
                 'profile' => $github + ['ai' => $card['ai'] ?? null],
-                // Derived rather than stored, so a card cannot report one rarity before it is
-                // claimed and another after.
-                'rarity' => app(GithubCardService::class)->rarityFor($github['login'], $github),
-                'axes' => (object) [],
+                // Whatever the admin lab saved wins. The derived tier is only the seed, for a card
+                // nobody has restyled and for the rows that predate storing it - which is what
+                // keeps a generated card from reporting one rarity before an edit and another
+                // after, while still letting it BE edited.
+                'rarity' => $card['rarity'] ?? app(GithubCardService::class)->rarityFor($github['login'], $github),
+                'axes' => (object) ($card['axes'] ?? []),
             ],
             'claimed' => false,
         ];

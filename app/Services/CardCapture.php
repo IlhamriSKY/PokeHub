@@ -32,8 +32,25 @@ class CardCapture
 
     private const DELAY_MS = 90;
 
-    /** Output width. The capture runs at 2x this and box-averages down, which is the AA pass. */
+    /**
+     * Output width for the ANIMATED format. 24 frames of a card is the one thing here with a file
+     * size worth minding in a README, so the GIF stays small while the stills do not.
+     */
     private const WIDTH = 320;
+
+    /**
+     * Output width for the stills, which are what people download and what a README renders on a
+     * high-DPI screen. 760px is a real card's 63mm at 300dpi. The stills used to share the GIF's
+     * 320px and came out as a soft little bitmap.
+     */
+    public const STILL_WIDTH = 760;
+
+    /**
+     * The matching height, measured on the real output rather than derived: the card's own aspect
+     * is 2.5:3.5, but the frame art carries a little bleed of its own. Seo reads this for
+     * og:image:height, which has to agree with the bytes or previews come back banded.
+     */
+    public const STILL_HEIGHT = 1058;
 
     /**
      * `png` is the same still image `svg` wraps, written raw, and exists for link previews: Open
@@ -128,8 +145,11 @@ class CardCapture
      */
     private function capture(string $url, string $outPath): void
     {
+        // The animated format is the only one that has to stay small; the stills are downloads.
+        $width = str_ends_with($outPath, '.gif') ? self::WIDTH : self::STILL_WIDTH;
+
         $proc = new Process(
-            [$this->node, base_path('scripts/capture-card.mjs'), $url, $outPath, (string) self::FRAMES, (string) self::WIDTH, (string) self::DELAY_MS],
+            [$this->node, base_path('scripts/capture-card.mjs'), $url, $outPath, (string) self::FRAMES, (string) $width, (string) self::DELAY_MS],
             base_path()
         );
         // A cold Chromium start plus 24 paints is not fast; well under this, but not fast.

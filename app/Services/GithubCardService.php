@@ -68,7 +68,14 @@ class GithubCardService
         return [
             Profile::updateOrCreate(
                 ['login' => $login],
-                ['github_json' => $profile, 'card_json' => ['ai' => $lore], 'fetched_at' => time()]
+                [
+                    'github_json' => $profile,
+                    // `rarity` and `axes` are stored, not derived on render, so a generated card is
+                    // a card like any other: the admin lab can restyle it, and the gallery can
+                    // filter on it in SQL instead of computing a tier per row in PHP.
+                    'card_json' => ['ai' => $lore, 'rarity' => $this->rarityFor($login, $profile), 'axes' => []],
+                    'fetched_at' => time(),
+                ]
             ),
             null,
             201,
