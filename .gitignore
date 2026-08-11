@@ -28,6 +28,9 @@ auth.json
 # card falls back to Cabin without them; drop your own licensed copies here for exact parity.
 /public/fonts/pcg/*
 !/public/fonts/pcg/README.md
+# Optional local-only developer routes. Stays on the machine that needs it: routes/web.php requires
+# it only when present, so a clone without it behaves exactly like production.
+/routes/dev.php
 Homestead.json
 Homestead.yaml
 npm-debug.log

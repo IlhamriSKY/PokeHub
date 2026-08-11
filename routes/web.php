@@ -117,6 +117,18 @@ require __DIR__.'/settings.php';
 require __DIR__.'/auth.php';
 
 /*
+ * Optional local-only developer routes.
+ *
+ * `routes/dev.php` is gitignored, so it exists on an individual machine and never in a clone or a
+ * deploy - which makes this require inert everywhere else. Whatever a developer puts there is
+ * responsible for its own access control; the environment is deliberately not consulted here,
+ * because this project runs with APP_ENV=production locally as well.
+ */
+if (is_file($dev = __DIR__.'/dev.php')) {
+    require $dev;
+}
+
+/*
  * Public slug routes, which must stay last. A slug resolves through PublicCardLookup to a claimed
  * account, an active showcase card or a cached profile.
  *
