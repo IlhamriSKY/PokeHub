@@ -238,7 +238,7 @@ export default function PublicCard({ owner, card }: { owner: { name: string; slu
                                 type="button"
                                 onClick={() => setZoomed(true)}
                                 aria-label="View card full size"
-                                className="animate-pop focus-visible:ring-ring mx-auto w-full cursor-zoom-in rounded-xl transition-transform duration-300 hover:-translate-y-2 focus-visible:ring-2 focus-visible:outline-none sm:max-w-[224px]"
+                                className="animate-pop focus-visible:ring-ring mx-auto w-full cursor-zoom-in rounded-xl transition-transform duration-300 hover:-translate-y-2 focus-visible:ring-1 focus-visible:outline-none sm:max-w-[224px]"
                             >
                                 <PokeCard profile={profile} rarity={rarity} {...overrides} />
                             </button>
@@ -334,7 +334,10 @@ export default function PublicCard({ owner, card }: { owner: { name: string; slu
                     <section className="bg-card rounded-2xl border p-5 text-center">
                         <h2 className="text-base font-bold tracking-tight">{cta.title}</h2>
                         <p className="text-muted-foreground mx-auto mt-1 max-w-md text-sm text-pretty">{cta.body}</p>
-                        <Button asChild className="group mt-3.5 h-10 px-5">
+                        {/* `lg` rather than a bare h-10: that was the one control in the app sitting
+                            between two rungs of the height scale. This is a page's call to action,
+                            which is what lg is for. */}
+                        <Button asChild size="lg" className="group mt-3.5 px-5">
                             <Link href={cta.href}>
                                 {/* decorative={false} keeps the ball in flow and click-through, so
                                     it cannot swallow the link's own click. Heavier stroke than the

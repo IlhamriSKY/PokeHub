@@ -112,7 +112,7 @@ export default function Dashboard() {
                                     type="button"
                                     onClick={() => setZoomed(true)}
                                     aria-label="View card full size"
-                                    className="focus-visible:ring-ring w-full cursor-zoom-in rounded-xl transition-transform duration-300 hover:-translate-y-1.5 focus-visible:ring-2 focus-visible:outline-none"
+                                    className="focus-visible:ring-ring w-full cursor-zoom-in rounded-xl transition-transform duration-300 hover:-translate-y-1.5 focus-visible:ring-1 focus-visible:outline-none"
                                 >
                                     <PokeCard profile={{ ...card.profile, rarity: card.rarity }} rarity={activeRarity} {...overrides} />
                                 </button>

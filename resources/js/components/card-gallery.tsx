@@ -367,13 +367,13 @@ export function CardGallery({
 
                 <div className="mt-3 flex flex-wrap items-center gap-2">
                     <Input
-                        className="h-9 flex-1 basis-56"
+                        className="flex-1 basis-56"
                         value={query}
                         onChange={(e) => setQuery(e.target.value)}
                         placeholder="Search variants - e.g. fairy, holo, trainer, rainbow"
                     />
                     <Select value={axis} onValueChange={setAxis}>
-                        <SelectTrigger className="h-9 w-56">
+                        <SelectTrigger className="w-56">
                             <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -386,16 +386,16 @@ export function CardGallery({
                         </SelectContent>
                     </Select>
                     {(q || axis !== 'all') && (
-                        <button
+                        <Button
                             type="button"
+                            variant="outline"
                             onClick={() => {
                                 setQuery('');
                                 setAxis('all');
                             }}
-                            className="text-muted-foreground hover:text-foreground h-9 rounded-md border px-2.5 text-xs"
                         >
                             Reset
-                        </button>
+                        </Button>
                     )}
                 </div>
             </div>
@@ -414,7 +414,7 @@ export function CardGallery({
                                             type="button"
                                             onClick={() => setZoom({ ...t, label: `${s.title} · ${t.label}` })}
                                             aria-label={`Preview ${t.label}`}
-                                            className="focus-visible:ring-ring w-full cursor-zoom-in rounded-lg transition-transform duration-200 hover:-translate-y-1 focus-visible:ring-2 focus-visible:outline-none"
+                                            className="focus-visible:ring-ring w-full cursor-zoom-in rounded-lg transition-transform duration-200 hover:-translate-y-1 focus-visible:ring-1 focus-visible:outline-none"
                                         >
                                             <PokeCard
                                                 profile={{ ...profile, rarity: t.rarity }}

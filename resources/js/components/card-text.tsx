@@ -9,7 +9,7 @@ function Textarea({ className, ...props }: ComponentProps<'textarea'>) {
     return (
         <textarea
             className={cn(
-                'border-input bg-background ring-offset-background placeholder:text-muted-foreground focus-visible:ring-ring flex w-full resize-y rounded-md border px-3 py-2 text-base focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-hidden disabled:cursor-not-allowed disabled:opacity-50 md:text-sm',
+                'border-input bg-background ring-offset-background placeholder:text-muted-foreground focus-visible:ring-ring flex w-full resize-y rounded-md border px-3 py-2 text-base focus-visible:ring-1 focus-visible:ring-offset-2 focus-visible:outline-hidden disabled:cursor-not-allowed disabled:opacity-50 md:text-sm',
                 className,
             )}
             {...props}
@@ -60,13 +60,12 @@ export function CardText({ text, onChange, showWhy }: { text: CardText; onChange
     return (
         <div className="space-y-3">
             <Field label="Card name" hint={`${text.name.length}/60`}>
-                <Input className="h-9" maxLength={60} value={text.name} onChange={(e) => set({ name: e.target.value })} />
+                <Input maxLength={60} value={text.name} onChange={(e) => set({ name: e.target.value })} />
             </Field>
 
             {showWhy && (
                 <Field label="Homepage caption" hint={`${(text.why ?? '').length}/120`}>
                     <Input
-                        className="h-9"
                         maxLength={120}
                         value={text.why ?? ''}
                         placeholder="Created Linux and Git."
@@ -76,7 +75,7 @@ export function CardText({ text, onChange, showWhy }: { text: CardText; onChange
             )}
 
             <Field label="Species / subtitle" hint={`${text.species.length}/22`}>
-                <Input className="h-9" maxLength={22} value={text.species} onChange={(e) => set({ species: e.target.value })} />
+                <Input maxLength={22} value={text.species} onChange={(e) => set({ species: e.target.value })} />
             </Field>
 
             <Field label="Flavor text" hint={`${text.flavor.length}/200`}>
@@ -94,25 +93,14 @@ export function CardText({ text, onChange, showWhy }: { text: CardText; onChange
                     <div className="grid grid-cols-3 gap-2">
                         <div className="col-span-2">
                             <Field label="Name" hint={`${attack(i).name.length}/16`}>
-                                <Input
-                                    className="h-9"
-                                    maxLength={16}
-                                    value={attack(i).name}
-                                    onChange={(e) => setAttack(i, { name: e.target.value })}
-                                />
+                                <Input maxLength={16} value={attack(i).name} onChange={(e) => setAttack(i, { name: e.target.value })} />
                             </Field>
                         </div>
                         <Field label="Damage">
-                            <Input
-                                className="h-9"
-                                maxLength={5}
-                                value={attack(i).damage}
-                                onChange={(e) => setAttack(i, { damage: e.target.value })}
-                            />
+                            <Input maxLength={5} value={attack(i).damage} onChange={(e) => setAttack(i, { damage: e.target.value })} />
                         </Field>
                         <Field label="Energy cost">
                             <Input
-                                className="h-9"
                                 type="number"
                                 min={1}
                                 max={4}
@@ -122,12 +110,7 @@ export function CardText({ text, onChange, showWhy }: { text: CardText; onChange
                         </Field>
                         <div className="col-span-2">
                             <Field label="Effect text" hint={`${attack(i).desc.length}/300`}>
-                                <Input
-                                    className="h-9"
-                                    maxLength={300}
-                                    value={attack(i).desc}
-                                    onChange={(e) => setAttack(i, { desc: e.target.value })}
-                                />
+                                <Input maxLength={300} value={attack(i).desc} onChange={(e) => setAttack(i, { desc: e.target.value })} />
                             </Field>
                         </div>
                     </div>

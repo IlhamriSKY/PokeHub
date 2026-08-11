@@ -265,7 +265,7 @@ function FanCard({
             onClick={() => onZoom(entry)}
             aria-label={`View ${entry.name}'s card`}
             title={`${entry.name} - ${entry.why}`}
-            className={`focus-visible:ring-ring cursor-zoom-in rounded-xl transition-[translate,filter] duration-300 hover:-translate-y-2 focus-visible:ring-2 focus-visible:outline-none ${className ?? ''}`}
+            className={`focus-visible:ring-ring cursor-zoom-in rounded-xl transition-[translate,filter] duration-300 hover:-translate-y-2 focus-visible:ring-1 focus-visible:outline-none ${className ?? ''}`}
             style={{
                 // Staggered entrance so the gate assembles rather than appearing. The keyframe is
                 // `pokehub-pop` (card.css) - a bare `pop` silently animates nothing. It animates

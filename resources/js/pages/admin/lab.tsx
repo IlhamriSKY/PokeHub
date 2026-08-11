@@ -96,15 +96,17 @@ export default function AdminLab({ targets, editing }: { targets: Target[]; edit
 
                     {flash?.success && <span className="text-xs text-emerald-500">{flash.success}</span>}
 
+                    {/* Default size, not `sm`: these share a toolbar row with the target Select, and
+                        the scale reserves h-8 for actions inside a table row. */}
                     {editing && (
-                        <Button size="sm" variant="outline" className="ml-auto" onClick={() => setGallery(true)}>
+                        <Button variant="outline" className="ml-auto" onClick={() => setGallery(true)}>
                             <LayoutGrid className="mr-1.5 h-4 w-4" />
                             All variants
                         </Button>
                     )}
 
                     {editing && (
-                        <Button size="sm" onClick={save} disabled={saving}>
+                        <Button onClick={save} disabled={saving}>
                             {saving ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Save className="mr-1.5 h-4 w-4" />}
                             Save
                         </Button>
@@ -120,7 +122,7 @@ export default function AdminLab({ targets, editing }: { targets: Target[]; edit
                                 type="button"
                                 onClick={() => setZoomed(true)}
                                 aria-label="View card full size"
-                                className="focus-visible:ring-ring w-full cursor-zoom-in rounded-xl transition-transform duration-300 hover:-translate-y-1.5 focus-visible:ring-2 focus-visible:outline-none"
+                                className="focus-visible:ring-ring w-full cursor-zoom-in rounded-xl transition-transform duration-300 hover:-translate-y-1.5 focus-visible:ring-1 focus-visible:outline-none"
                             >
                                 <PokeCard {...cardProps(editing)} />
                             </button>
@@ -129,18 +131,22 @@ export default function AdminLab({ targets, editing }: { targets: Target[]; edit
                             </p>
                         </div>
                         <div className="min-w-0">
-                            <div className="bg-muted mb-4 inline-flex rounded-lg p-0.5">
+                            {/* The same default/outline pair the card list uses for its filter tabs,
+                                rather than a second hand-rolled pill strip. It was the one segmented
+                                control in the app that was not a Button, which put it at 27px beside
+                                36px everywhere else. */}
+                            <div className="mb-4 flex gap-1">
                                 {(['style', 'text'] as const).map((t) => (
-                                    <button
+                                    <Button
                                         key={t}
                                         type="button"
+                                        variant={tab === t ? 'default' : 'outline'}
+                                        className="capitalize"
+                                        aria-pressed={tab === t}
                                         onClick={() => setTab(t)}
-                                        className={`rounded-md px-3 py-1.5 text-xs font-medium capitalize transition-colors ${
-                                            tab === t ? 'bg-background shadow-sm' : 'text-muted-foreground hover:text-foreground'
-                                        }`}
                                     >
                                         {t}
-                                    </button>
+                                    </Button>
                                 ))}
                             </div>
 

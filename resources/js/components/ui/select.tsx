@@ -17,7 +17,7 @@ const SelectTrigger = React.forwardRef<
     <SelectPrimitive.Trigger
         ref={ref}
         className={cn(
-            'flex h-9 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-hidden focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 [&>span]:line-clamp-1',
+            'flex h-9 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-hidden focus:ring-1 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 [&>span]:line-clamp-1',
             className,
         )}
         {...props}
@@ -72,19 +72,6 @@ function text(node: React.ReactNode): string {
     return '';
 }
 
-/** Shown when the filter leaves nothing. */
-/** How many selectable rows a subtree holds, looking through SelectGroup and friends. */
-function countItems(node: React.ReactNode): number {
-    return React.Children.toArray(node).reduce<number>((n, child) => {
-        if (!React.isValidElement(child)) return n;
-        const kids = (child.props as { children?: React.ReactNode }).children;
-        const inner = countItems(kids);
-
-        // A leaf with no element children of its own is an option; anything else is a wrapper.
-        return n + (inner === 0 ? 1 : inner);
-    }, 0);
-}
-
 /** Does this child - an item, or a group of them - still have anything to show? */
 function matches(node: React.ReactNode, query: string): boolean {
     if (!React.isValidElement(node)) return false;
@@ -94,23 +81,25 @@ function matches(node: React.ReactNode, query: string): boolean {
     return own || React.Children.toArray(kids).some((k) => matches(k, query));
 }
 
+/** Shown when the filter leaves nothing. */
 function Empty() {
     return <div className="text-muted-foreground py-6 text-center text-sm">No match.</div>;
 }
 
-/** Below this many options, a search box is more clutter than help. */
-const SEARCH_THRESHOLD = 8;
-
+/**
+ * EVERY dropdown gets the search box, with no minimum option count.
+ *
+ * There used to be a threshold of eight, on the reasoning that a search box over a three-item list
+ * is clutter. It was dropped on purpose: one dropdown behaving differently from the one beside it is
+ * the more expensive kind of surprise, because it makes you check each menu instead of trusting all
+ * of them. The five short pickers in the card lab (Generation, Rule, Subtype, Badge, Tag) were the
+ * only ones without it, and were exactly the ones that read as broken.
+ */
 const SelectContent = React.forwardRef<
     React.ElementRef<typeof SelectPrimitive.Content>,
     React.ComponentPropsWithoutRef<typeof SelectPrimitive.Content>
 >(({ className, children, position = 'popper', ...props }, ref) => {
     const [query, setQuery] = React.useState('');
-    // Only worth a search box once the list is long enough to scroll past. Counted through
-    // groups, not just across the top level: a menu that sorts its options into SelectGroups -
-    // the card lab's target picker is three of them - has only a handful of direct children, and
-    // counting those left the longest lists in the app as the ones without a search box.
-    const searchable = countItems(children) >= SEARCH_THRESHOLD;
 
     return (
     <SelectPrimitive.Portal>
@@ -125,25 +114,49 @@ const SelectContent = React.forwardRef<
             position={position}
             {...props}
         >
-            {searchable && (
-                <div className="flex items-center gap-2 border-b px-2" onKeyDown={(e) => e.stopPropagation()}>
-                    <Search className="text-muted-foreground h-3.5 w-3.5 shrink-0" />
-                    <input
-                        // Radix owns keyboard focus inside an open Select and steers letters into
-                        // its own typeahead. Autofocusing on the next frame wins that race, and
-                        // stopping propagation above keeps typing in the box instead of jumping
-                        // the highlight to whichever option starts with that letter.
-                        ref={(el) => {
-                            if (el) requestAnimationFrame(() => el.focus());
-                        }}
-                        value={query}
-                        onChange={(e) => setQuery(e.target.value)}
-                        placeholder="Search..."
-                        aria-label="Filter options"
-                        className="placeholder:text-muted-foreground h-8 w-full bg-transparent text-sm outline-hidden"
-                    />
-                </div>
-            )}
+            <div
+                className="flex items-center gap-2 border-b px-2"
+                onKeyDown={(e) => {
+                    // Printable keys stay in the box. Letting them through drives Radix's own
+                    // typeahead, which jumps the highlight to whatever starts with that letter
+                    // half way through a word.
+                    if (e.key.length === 1) {
+                        e.stopPropagation();
+
+                        return;
+                    }
+
+                    // Arrows hand over to the list. Radix navigates by moving focus from one item
+                    // to the next, and has no item to move FROM while focus sits in this input - so
+                    // an arrow press did nothing at all, and a dropdown was mouse-only from the
+                    // moment the box took focus. Focusing an end of the list gives Radix the anchor
+                    // it needs and Enter then selects through Radix itself. Only options that
+                    // survived the filter are in the DOM, so this lands on a row that is visible.
+                    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+                        const items = e.currentTarget.parentElement?.querySelectorAll<HTMLElement>('[role="option"]');
+                        const edge = items?.length ? items[e.key === 'ArrowDown' ? 0 : items.length - 1] : null;
+                        if (edge) {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            edge.focus();
+                        }
+                    }
+                }}
+            >
+                <Search className="text-muted-foreground h-3.5 w-3.5 shrink-0" />
+                <input
+                    // Radix owns keyboard focus inside an open Select and steers letters into its
+                    // own typeahead. Autofocusing on the next frame wins that race.
+                    ref={(el) => {
+                        if (el) requestAnimationFrame(() => el.focus());
+                    }}
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                    placeholder="Search..."
+                    aria-label="Filter options"
+                    className="placeholder:text-muted-foreground h-8 w-full bg-transparent text-sm outline-hidden"
+                />
+            </div>
             <SelectScrollUpButton />
             <SelectPrimitive.Viewport
                 className={cn(
@@ -154,7 +167,7 @@ const SelectContent = React.forwardRef<
                 <FilterContext.Provider value={query}>{children}</FilterContext.Provider>
                 {/* Counted here rather than left to the items: each one hides itself, so this is
                     the only place that can tell whether any of them survived the filter. */}
-                {searchable && query !== '' && !React.Children.toArray(children).some((c) => matches(c, query)) && <Empty />}
+                {query !== '' && !React.Children.toArray(children).some((c) => matches(c, query)) && <Empty />}
             </SelectPrimitive.Viewport>
             <SelectScrollDownButton />
         </SelectPrimitive.Content>

@@ -206,7 +206,7 @@ export default function AdminCards({
                                         type="button"
                                         onClick={() => setZoom(c)}
                                         aria-label={`View ${c.name}'s card full size`}
-                                        className="focus-visible:ring-ring block w-14 cursor-zoom-in rounded-md transition-transform duration-200 hover:scale-105 focus-visible:ring-2 focus-visible:outline-none"
+                                        className="focus-visible:ring-ring block w-14 cursor-zoom-in rounded-md transition-transform duration-200 hover:scale-105 focus-visible:ring-1 focus-visible:outline-none"
                                     >
                                         {render(c)}
                                     </button>

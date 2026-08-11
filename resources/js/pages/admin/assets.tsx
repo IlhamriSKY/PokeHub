@@ -270,12 +270,14 @@ export default function AdminAssets({ categories, assets }: { categories: string
                                     Enabled
                                 </Label>
                             </div>
-                            <Button size="sm" onClick={submit} disabled={!form.slug}>
+                            {/* This form's own submit, sitting under a column of Inputs and Selects,
+                                so it takes the scale's form height rather than the table-row one. */}
+                            <Button onClick={submit} disabled={!form.slug}>
                                 {form.id ? <Check className="mr-1.5 h-4 w-4" /> : <Plus className="mr-1.5 h-4 w-4" />}
                                 {form.id ? 'Update asset' : 'Add asset'}
                             </Button>
                             {form.id && (
-                                <Button size="sm" variant="ghost" onClick={() => setForm(blank(form.category))}>
+                                <Button variant="ghost" onClick={() => setForm(blank(form.category))}>
                                     <X className="mr-1.5 h-4 w-4" />
                                     Cancel
                                 </Button>

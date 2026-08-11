@@ -83,7 +83,7 @@ export default function Profile({ mustVerifyEmail, status }: { mustVerifyEmail: 
                                         href={route('verification.send')}
                                         method="post"
                                         as="button"
-                                        className="rounded-md text-sm text-neutral-600 underline hover:text-neutral-900 focus:ring-2 focus:ring-offset-2 focus:outline-hidden"
+                                        className="rounded-md text-sm text-neutral-600 underline hover:text-neutral-900 focus:ring-1 focus:ring-offset-2 focus:outline-hidden"
                                     >
                                         Click here to re-send the verification email.
                                     </Link>

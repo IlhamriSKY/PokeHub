@@ -1,3 +1,4 @@
+import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -213,19 +214,15 @@ export function CardSettings({
                 {showAll && (
                     <div className="col-span-2 flex flex-wrap items-center gap-2">
                         <Input
-                            className="h-9 flex-1 basis-48"
+                            className="flex-1 basis-48"
                             value={query}
                             onChange={(e) => setQuery(e.target.value)}
                             placeholder="Search settings and options - e.g. dual, fairy, holo"
                         />
                         {query && (
-                            <button
-                                type="button"
-                                onClick={() => setQuery('')}
-                                className="text-muted-foreground hover:text-foreground h-9 rounded-md border px-2.5 text-xs"
-                            >
+                            <Button type="button" variant="outline" onClick={() => setQuery('')}>
                                 Clear
-                            </button>
+                            </Button>
                         )}
                         <label className="text-muted-foreground flex cursor-pointer items-center gap-2 text-xs whitespace-nowrap">
                             <Checkbox checked={hideUnavailable} onCheckedChange={(v) => setHideUnavailable(v === true)} />
@@ -237,7 +234,7 @@ export function CardSettings({
                 <div className="col-span-2">
                     <Field label="Rarity" keywords={rarities.map((r) => `${r.label} ${r.era}`)}>
                         <Select value={rarity} onValueChange={onRarityChange}>
-                            <SelectTrigger className="h-9">
+                            <SelectTrigger>
                                 <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
@@ -254,7 +251,7 @@ export function CardSettings({
                 <div className="col-span-2">
                     <Field label="Generation (card frame)" keywords={kw(options.generation)}>
                         <Select value={a.generation} onValueChange={changeGeneration}>
-                            <SelectTrigger className="h-9">
+                            <SelectTrigger>
                                 <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
@@ -272,7 +269,7 @@ export function CardSettings({
                 <div className="col-span-2">
                     <Field label="Variant / template" keywords={kw(options.variant)}>
                         <Select value={a.variant} onValueChange={changeVariant}>
-                            <SelectTrigger className="h-9">
+                            <SelectTrigger>
                                 <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
@@ -285,7 +282,7 @@ export function CardSettings({
                 {!isTrainer && (
                     <Field label="Element / type" keywords={kw(options.element)}>
                         <Select value={shownElement} onValueChange={(v) => set({ element: v })}>
-                            <SelectTrigger className="h-9">
+                            <SelectTrigger>
                                 <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
@@ -298,7 +295,7 @@ export function CardSettings({
                 {!isTrainer && (
                     <Field label="Dual type" keywords={kw(options.element)}>
                         <Select value={a.dualType} onValueChange={(v) => set({ dualType: v })}>
-                            <SelectTrigger className="h-9">
+                            <SelectTrigger>
                                 <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
@@ -316,7 +313,7 @@ export function CardSettings({
                 {(genFrames.length > 0 || listAll) && (
                     <Field label="Frame" keywords={kw(options.frame)}>
                         <Select value={a.frame} onValueChange={(v) => set({ frame: v })}>
-                            <SelectTrigger className="h-9">
+                            <SelectTrigger>
                                 <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
@@ -329,7 +326,7 @@ export function CardSettings({
 
                 <Field label="Glare / holo" keywords={kw(options.glare)}>
                     <Select value={a.glare} onValueChange={(v) => set({ glare: v })}>
-                        <SelectTrigger className="h-9">
+                        <SelectTrigger>
                             <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -346,7 +343,7 @@ export function CardSettings({
                 {!isTrainer && (
                     <Field label="Subtype (stage)" keywords={kw(subtypesFromOptions(options))}>
                         <Select value={a.subtype} onValueChange={(v) => set({ subtype: v })}>
-                            <SelectTrigger className="h-9">
+                            <SelectTrigger>
                                 <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
@@ -359,7 +356,7 @@ export function CardSettings({
 
                 <Field label="Rarity mark" keywords={kw(options.rarity)}>
                     <Select value={a.rarityMark} onValueChange={(v) => set({ rarityMark: v })}>
-                        <SelectTrigger className="h-9">
+                        <SelectTrigger>
                             <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -378,7 +375,7 @@ export function CardSettings({
                 {(attributeFramesForGen(a.generation).length > 0 || listAll) && (
                     <Field label="Attribute frame" keywords={ATTRIBUTE_FRAMES.map(cap)}>
                         <Select value={a.attributeFrame} onValueChange={(v) => set({ attributeFrame: v })}>
-                            <SelectTrigger className="h-9">
+                            <SelectTrigger>
                                 <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
@@ -398,7 +395,7 @@ export function CardSettings({
                 {(supportsChrome(a.generation) || listAll) && (
                     <Field label="Tag stamp" keywords={kw(options.tag)}>
                         <Select value={a.tag} onValueChange={(v) => set({ tag: v })}>
-                            <SelectTrigger className="h-9">
+                            <SelectTrigger>
                                 <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
@@ -412,7 +409,7 @@ export function CardSettings({
                 {(supportsChrome(a.generation) || listAll) && (
                     <Field label="Set badge" keywords={kw(options.badge)}>
                         <Select value={a.badge} onValueChange={(v) => set({ badge: v })}>
-                            <SelectTrigger className="h-9">
+                            <SelectTrigger>
                                 <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
@@ -430,7 +427,7 @@ export function CardSettings({
                 {!isTrainer && (supportsChrome(a.generation) || listAll) && (
                     <Field label="Name icon" keywords={kw(options.icon)}>
                         <Select value={a.icon} onValueChange={(v) => set({ icon: v })}>
-                            <SelectTrigger className="h-9">
+                            <SelectTrigger>
                                 <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
@@ -453,7 +450,7 @@ export function CardSettings({
                     offering several here would silently drop all but one on save. */}
                 <Field label="Visual effect" keywords={kw(options.effect)}>
                     <Select value={a.effect} onValueChange={(v) => set({ effect: v })}>
-                        <SelectTrigger className="h-9">
+                        <SelectTrigger>
                             <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -471,7 +468,6 @@ export function CardSettings({
                     <div className="col-span-2">
                         <Field label="Evolves from" keywords={['stage', 'evolution']}>
                             <Input
-                                className="h-9"
                                 value={a.evolvesFrom}
                                 onChange={(e) => set({ evolvesFrom: e.target.value })}
                                 placeholder="e.g. Charmeleon (blank = none)"

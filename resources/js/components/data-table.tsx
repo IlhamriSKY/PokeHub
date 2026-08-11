@@ -39,7 +39,12 @@ export function DataTable({
             {toolbar && <CardHeader className="flex flex-col gap-3 space-y-0 sm:flex-row sm:items-center">{toolbar}</CardHeader>}
 
             <CardContent className="p-0">
-                <div className="overflow-x-auto">
+                {/* `relative` so this box is the containing block for what it scrolls. The header
+                    cells hold `sr-only` labels, which are position:absolute - without a positioned
+                    ancestor here they resolved against the layout's own `relative` main element,
+                    escaped the clipping entirely, and stretched the document to the table's full
+                    width on a phone even once the table itself was contained. */}
+                <div className="relative overflow-x-auto">
                     <table className="w-full text-sm">
                         <thead className="text-muted-foreground bg-muted/40 text-xs">
                             <tr className="border-border border-y [&>th]:p-3 [&>th]:text-left [&>th]:font-medium">{head}</tr>

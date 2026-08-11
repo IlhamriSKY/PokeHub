@@ -99,13 +99,13 @@ export default function Cards({ cards, q, rarity, showcase = [] }: { cards: Pagi
                             value={term}
                             spellCheck={false}
                             placeholder="Search by name or GitHub handle"
-                            className="h-9 pl-9"
+                            className="pl-9"
                             onChange={(e) => setTerm(e.target.value)}
                         />
                     </div>
 
                     <Select value={tier} onValueChange={setTier}>
-                        <SelectTrigger className="h-9 w-[190px] shrink-0">
+                        <SelectTrigger className="w-[190px] shrink-0">
                             <SelectValue placeholder="All rarities" />
                         </SelectTrigger>
                         <SelectContent>
@@ -137,7 +137,7 @@ export default function Cards({ cards, q, rarity, showcase = [] }: { cards: Pagi
                                     type="button"
                                     onClick={() => setZoom(row)}
                                     aria-label={`View card: ${row.name}`}
-                                    className="focus-visible:ring-ring w-full cursor-zoom-in rounded-xl transition-transform duration-300 hover:-translate-y-2 focus-visible:ring-2 focus-visible:outline-none"
+                                    className="focus-visible:ring-ring w-full cursor-zoom-in rounded-xl transition-transform duration-300 hover:-translate-y-2 focus-visible:ring-1 focus-visible:outline-none"
                                 >
                                     {render(row)}
                                 </button>

@@ -31,7 +31,7 @@ export default function AdminIndex({ stats, recent_activity }: { stats: Stats; r
                         <Link
                             key={t.label}
                             href={t.href}
-                            className="group focus-visible:ring-ring rounded-xl focus-visible:ring-2 focus-visible:outline-none"
+                            className="group focus-visible:ring-ring rounded-xl focus-visible:ring-1 focus-visible:outline-none"
                         >
                             <Card className="group-hover:border-primary h-full transition-colors">
                                 <CardContent className="p-4">
