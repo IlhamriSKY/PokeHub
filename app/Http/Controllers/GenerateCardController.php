@@ -4,8 +4,12 @@ namespace App\Http\Controllers;
 
 use App\Models\User;
 use App\Rules\Turnstile as TurnstileRule;
+use App\Services\CardCapture;
 use App\Services\GithubCardService;
+use App\Services\PublicCardLookup;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
+use Throwable;
 
 /**
  * The home page's search box: turn any GitHub handle into a card.
@@ -66,6 +70,20 @@ class GenerateCardController extends Controller
             ->causedBy($request->user())
             ->withProperties(['action' => 'generate', 'login' => $login])
             ->log(($request->user()?->name ?? 'A visitor').' generated @'.$login);
+
+        // Render the share image now, while the visitor is already waiting on a GitHub fetch and an
+        // AI call. It is the og:image, and a cold one takes ~6s to produce - longer than most link
+        // scrapers wait - so the FIRST time a new card was shared anywhere it previewed as a bare
+        // title. Best effort: a failed capture must not fail the generate, since the card itself
+        // is fine and the route will render the image on demand as before.
+        try {
+            $found = app(PublicCardLookup::class)->find($login);
+            if ($found) {
+                app(CardCapture::class)->ensure($login, $found['card'], 'png');
+            }
+        } catch (Throwable $e) {
+            Log::warning('og warm failed', ['login' => $login, 'error' => $e->getMessage()]);
+        }
 
         return redirect('/'.$login);
     }
