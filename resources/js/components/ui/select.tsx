@@ -73,6 +73,18 @@ function text(node: React.ReactNode): string {
 }
 
 /** Shown when the filter leaves nothing. */
+/** How many selectable rows a subtree holds, looking through SelectGroup and friends. */
+function countItems(node: React.ReactNode): number {
+    return React.Children.toArray(node).reduce<number>((n, child) => {
+        if (!React.isValidElement(child)) return n;
+        const kids = (child.props as { children?: React.ReactNode }).children;
+        const inner = countItems(kids);
+
+        // A leaf with no element children of its own is an option; anything else is a wrapper.
+        return n + (inner === 0 ? 1 : inner);
+    }, 0);
+}
+
 /** Does this child - an item, or a group of them - still have anything to show? */
 function matches(node: React.ReactNode, query: string): boolean {
     if (!React.isValidElement(node)) return false;
@@ -94,8 +106,11 @@ const SelectContent = React.forwardRef<
     React.ComponentPropsWithoutRef<typeof SelectPrimitive.Content>
 >(({ className, children, position = 'popper', ...props }, ref) => {
     const [query, setQuery] = React.useState('');
-    // Only worth a search box once the list is long enough to scroll past.
-    const searchable = React.Children.toArray(children).length >= SEARCH_THRESHOLD;
+    // Only worth a search box once the list is long enough to scroll past. Counted through
+    // groups, not just across the top level: a menu that sorts its options into SelectGroups -
+    // the card lab's target picker is three of them - has only a handful of direct children, and
+    // counting those left the longest lists in the app as the ones without a search box.
+    const searchable = countItems(children) >= SEARCH_THRESHOLD;
 
     return (
     <SelectPrimitive.Portal>
