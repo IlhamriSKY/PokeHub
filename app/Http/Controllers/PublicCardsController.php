@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\User;
+use App\Support\CardPayload;
 use App\Support\GeneratedCards;
 use App\Support\Seo;
 use Illuminate\Http\Request;
@@ -11,6 +12,16 @@ use Inertia\Inertia;
 
 class PublicCardsController extends Controller
 {
+    /**
+     * Divisible by every column count the grid settles on (it auto-fills between 2 and 8), so the
+     * last row is full at any width. Held back from going higher by paint cost rather than
+     * payload: every card carries the holo foil's stacked blend layers.
+     *
+     * Both halves of the list are already in memory by the time this applies, so CardPayload trims
+     * each card on the way out rather than relying on the page size to bound the response.
+     */
+    private const PER_PAGE = 24;
+
     public function index(Request $request)
     {
         $q = trim((string) $request->query('q', ''));
@@ -35,7 +46,7 @@ class PublicCardsController extends Controller
                 'name' => $u->name,
                 'slug' => $u->slug,
                 'github_login' => $u->github_login,
-                'card' => $u->card,
+                'card' => CardPayload::slim($u->card),
             ]);
 
         /*
@@ -51,14 +62,14 @@ class PublicCardsController extends Controller
             'name' => $g['name'],
             'slug' => $g['slug'],
             'github_login' => $g['github_login'],
-            'card' => $g['card'],
+            'card' => CardPayload::slim($g['card']),
         ]));
 
         $page = LengthAwarePaginator::resolveCurrentPage();
         $cards = new LengthAwarePaginator(
-            $rows->forPage($page, 10)->values(),
+            $rows->forPage($page, self::PER_PAGE)->values(),
             $rows->count(),
-            10,
+            self::PER_PAGE,
             $page,
             ['path' => LengthAwarePaginator::resolveCurrentPath()]
         );

@@ -16,7 +16,20 @@ const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Activity log', href: '/admin/activity' },
 ];
 
-type ActivityRow = { id: number; log_name: string; description: string; subject: string | null; causer: string | null; created_at: string };
+type Change = { field: string; from: string; to: string };
+
+type ActivityRow = {
+    id: number;
+    log_name: string;
+    description: string;
+    subject: string | null;
+    causer: string | null;
+    /** Field-level before and after, when the entry recorded any. */
+    changes: Change[];
+    /** Hand-set properties worth showing, such as the slug or handle involved. */
+    context: Record<string, string>;
+    created_at: string;
+};
 export default function AdminActivity({
     activities,
     logs,
@@ -89,7 +102,7 @@ export default function AdminActivity({
                     head={
                         <>
                             <th scope="col">Log</th>
-                            <th scope="col">Description</th>
+                            <th scope="col">What happened</th>
                             <th scope="col">Subject</th>
                             <th scope="col">By</th>
                             <th scope="col">When</th>
@@ -105,10 +118,37 @@ export default function AdminActivity({
                             <td className="p-3">
                                 <Badge variant="secondary">{a.log_name}</Badge>
                             </td>
-                            <td className="p-3">{a.description}</td>
-                            <td className="text-muted-foreground p-3 text-xs">{a.subject ?? '—'}</td>
-                            <td className="p-3">{a.causer ?? <span className="text-muted-foreground">system</span>}</td>
-                            <td className="text-muted-foreground p-3 text-xs whitespace-nowrap">{a.created_at}</td>
+                            <td className="p-3 align-top">
+                                <span>{a.description}</span>
+
+                                {/* What actually changed. Without this the log says an account was
+                                    edited but never which field, which is the only part worth
+                                    auditing. */}
+                                {a.changes.length > 0 && (
+                                    <ul className="text-muted-foreground mt-1 space-y-0.5 text-xs">
+                                        {a.changes.map((c) => (
+                                            <li key={c.field}>
+                                                <span className="font-medium">{c.field}</span>{' '}
+                                                <span className="line-through opacity-70">{c.from}</span> <span aria-hidden="true">→</span>{' '}
+                                                <span>{c.to}</span>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                )}
+
+                                {Object.keys(a.context).length > 0 && (
+                                    <div className="mt-1 flex flex-wrap gap-1">
+                                        {Object.entries(a.context).map(([k, v]) => (
+                                            <Badge key={k} variant="outline" className="font-normal">
+                                                {k}: {v}
+                                            </Badge>
+                                        ))}
+                                    </div>
+                                )}
+                            </td>
+                            <td className="text-muted-foreground p-3 align-top text-xs">{a.subject ?? '—'}</td>
+                            <td className="p-3 align-top">{a.causer ?? <span className="text-muted-foreground">system</span>}</td>
+                            <td className="text-muted-foreground p-3 align-top text-xs whitespace-nowrap">{a.created_at}</td>
                         </Row>
                     ))}
                 </DataTable>

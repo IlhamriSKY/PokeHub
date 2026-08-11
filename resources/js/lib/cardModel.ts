@@ -70,6 +70,23 @@ export const dualSupported = (generation: string, slug: string): boolean =>
         : elementSupported(generation, slug);
 
 /**
+ * The second element a card takes when no axis names one, derived from the developer's second
+ * language exactly as the primary is derived from their first.
+ *
+ * A generated card carries no stored axes, so its `dualType` is always the 'auto' sentinel. Without
+ * this it could never show two elements however many languages the profile lists.
+ *
+ * Undefined when there is no second language, when it resolves to the same element as the primary
+ * (a card cannot be dual with itself), or when this generation does not offer that element as a
+ * dual.
+ */
+export function autoDualType(langs: string[] | undefined, generation: string, primary: string): Element | undefined {
+    const second = langs?.[1] ? langType(langs[1]) : undefined;
+
+    return second && second !== primary && dualSupported(generation, second) ? (second as Element) : undefined;
+}
+
+/**
  * Does this generation offer the "chrome" axes - Name icon, Tag stamp, Set badge?
  *
  * 1st gen does NOT. Verified live on pokecardgenerator: its Information panel is Generation,

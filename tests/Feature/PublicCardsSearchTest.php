@@ -17,6 +17,38 @@ class PublicCardsSearchTest extends TestCase
         ]);
     }
 
+    /**
+     * The gallery is thumbnails, so a page has to fill more than a row or two. The trim keeps that
+     * affordable: `top_repos` and `all_langs` are AI prompt inputs that nothing on the card draws,
+     * and at roughly a third of each blob they would otherwise be the bulk of the response.
+     */
+    public function test_a_gallery_page_holds_24_cards_without_their_ai_inputs()
+    {
+        User::factory()->count(30)->sequence(fn ($s) => ['slug' => 'trainer-'.$s->index])->create([
+            'is_public' => true,
+            'card' => [
+                'rarity' => 'holo',
+                'profile' => [
+                    'name' => 'x',
+                    'followers' => 1,
+                    'top_repos' => [['name' => 'repo', 'desc' => 'never drawn on the card']],
+                    'all_langs' => ['PHP', 'Go', 'Rust'],
+                ],
+            ],
+        ]);
+
+        $this->actingAs(User::factory()->create())
+            ->get('/cards')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->where('cards.total', 30)
+                ->count('cards.data', 24)
+                // Still everything the face prints.
+                ->where('cards.data.0.card.profile.followers', 1)
+                ->missing('cards.data.0.card.profile.top_repos')
+                ->missing('cards.data.0.card.profile.all_langs'));
+    }
+
     public function test_private_cards_are_never_listed()
     {
         $this->card(['name' => 'Public Pat', 'slug' => 'pat', 'is_public' => true]);

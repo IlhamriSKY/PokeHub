@@ -1212,7 +1212,9 @@
 .gen-1-gen .pcg-badge {
     left: 6%;
     bottom: 1.6%;
-    width: 10cqw;
+    /* Scaled with the other generations' badges; this one sits in the bottom band rather than the
+       artwork, so it has no vertical offset to keep in step. */
+    width: 15cqw;
     z-index: 3;
 }
 /* 1st-gen dual type: the base frame bakes the PRIMARY emblem near the right edge
@@ -1263,15 +1265,18 @@
    (`.card__rotator img:not(.card__back) { transform: translate3d(0,0,0.01px) }`, specificity 0-2-1)
    and beats any `.gen-x .pcg-badge` rule (0-2-0), so the `translateY(-50%)` that used to sit here
    was silently dropped - the badge hung a half-height LOW on tcg-gen too, for as long as the rule
-   has existed. A square 18cqw box with `object-fit: contain` (base rule above) needs no transform:
-   any aspect centres itself inside it, and `top` places the box, not the ink. */
+   has existed. A square box with `object-fit: contain` (base rule above) needs no transform: any
+   aspect centres itself inside it, and `top` places the box, not the ink.
+
+   The offset in `top` is half the box, which is what keeps the badge centred on the measured
+   40.66% line. Change the size and that half has to move with it. */
 .gen-tcg-gen .pcg-badge,
 .gen-scarlet-violet .pcg-badge {
     right: 1.5%;
-    top: calc(40.66% - 9cqw);
+    top: calc(40.66% - 13.5cqw);
     bottom: auto;
-    width: 18cqw;
-    height: 18cqw;
+    width: 27cqw;
+    height: 27cqw;
     /* Round symbols then land on the measured right edge instead of floating off it when a
        wide wordmark badge leaves slack in the box. */
     object-position: right center;

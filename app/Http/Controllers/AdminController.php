@@ -7,11 +7,15 @@ use App\Models\Profile;
 use App\Models\User;
 use App\Services\AvatarCache;
 use App\Services\CardSettingsService;
+use App\Support\CardPayload;
 use App\Support\GeneratedCards;
 use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
@@ -25,6 +29,9 @@ use Spatie\Permission\Models\Role;
 class AdminController extends Controller
 {
     private const CATEGORIES = ['generation', 'element', 'variant', 'frame', 'effect', 'glare', 'rarity', 'rarity_preset', 'subtype', 'icon', 'tag', 'badge'];
+
+    /** Rows carry a card thumbnail now, so the page is bounded by paint cost rather than bytes. */
+    private const CARDS_PER_PAGE = 12;
 
     /** The card lab: restyle any card, including the ones on the landing page. */
     public function lab(Request $request, CardSettingsService $settings)
@@ -78,7 +85,9 @@ class AdminController extends Controller
             ],
             // Column-scoped like the activity page: a bare with('causer') would hydrate whole User
             // rows, card blob and email included, to print eight names.
-            'recent_activity' => Activity::with('causer:id,name')->latest()->limit(8)->get()->map(fn ($a) => $this->activityRow($a)),
+            // Ordered by id, not created_at: several entries can share a second, and ordering on
+            // the timestamp alone leaves their relative order undefined.
+            'recent_activity' => Activity::with('causer:id,name')->latest('id')->limit(8)->get()->map(fn ($a) => $this->activityRow($a)),
         ]);
     }
 
@@ -160,8 +169,10 @@ class AdminController extends Controller
         ]);
         $user->syncRoles($newRoles);
 
+        // The name goes in the description as well as the subject, so the entry still reads if the
+        // account is deleted later. The changed fields ride along in the model's own log entry.
         activity('admin')->causedBy(Auth::user())->performedOn($user)
-            ->log('Admin updated user #'.$user->id);
+            ->log("Updated {$user->name}'s account");
 
         return back()->with('success', 'User updated.');
     }
@@ -176,11 +187,17 @@ class AdminController extends Controller
             return back()->with('error', 'This is the last admin. Deleting it would lock everyone out of this panel.');
         }
         // Their face is a copy of a real person's photograph sitting on our disk. Deleting the
-        // account and keeping it would be the wrong half of the job - and nothing else would ever
+        // account and keeping it would be the wrong half of the job, and nothing else would ever
         // clean it up, because AvatarCache only ever refreshes a login it can still resolve.
         app(AvatarCache::class)->forget((string) $user->github_login);
+
+        // Logged before the delete, and without performedOn: the subject is about to stop
+        // existing, so everything worth keeping has to be in the description and the properties.
+        activity('admin')->causedBy(Auth::user())
+            ->withProperties(array_filter(['slug' => $user->slug, 'login' => $user->github_login]))
+            ->log("Deleted {$user->name}'s account (#{$user->id})");
+
         $user->delete();
-        activity('admin')->causedBy(Auth::user())->log('Admin deleted user #'.$user->id);
 
         return back()->with('success', 'User deleted.');
     }
@@ -189,8 +206,10 @@ class AdminController extends Controller
      * Every user who has a card, with its rarity, share state and originating GitHub handle, so a
      * public slug can be reviewed and taken down.
      *
-     * The `card` blob is never selected. The handful of fields the list needs are extracted in
-     * SQL, which keeps a page to a few hundred bytes rather than megabytes.
+     * The card itself is shipped, trimmed by CardPayload, because the row draws a thumbnail: a
+     * private card cannot be previewed through the public image route, and moderating a card you
+     * cannot see is guesswork. The stat columns are read from that same blob rather than extracted
+     * again in SQL, so nothing travels twice.
      */
     public function cards(Request $request)
     {
@@ -199,15 +218,7 @@ class AdminController extends Controller
         $rarity = trim((string) $request->query('rarity', ''));
 
         $cards = User::query()
-            ->select(['id', 'name', 'email', 'slug', 'is_public', 'avatar', 'github_login', 'updated_at'])
-            // JSON selectors rather than raw SQL, so the grammar emits whatever the driver needs.
-            // Written out by hand this is MySQL-only, and the JSON functions differ per driver.
-            ->addSelect([
-                'card->rarity as rarity',
-                'card->profile->login as gh_login',
-                'card->profile->followers as followers',
-                'card->profile->stars as stars',
-            ])
+            ->select(['id', 'name', 'email', 'slug', 'is_public', 'avatar', 'github_login', 'updated_at', 'card'])
             ->whereNotNull('card')
             ->when($only === 'public', fn ($q) => $q->where('is_public', true)->whereNotNull('slug'))
             ->when($only === 'private', fn ($q) => $q->where(fn ($w) => $w->where('is_public', false)->orWhereNull('slug')))
@@ -218,19 +229,29 @@ class AdminController extends Controller
             ->when($rarity !== '', fn ($q) => $q->where('card->rarity', $rarity))
             ->orderByDesc('updated_at')
             ->get()
-            ->map(fn (User $u) => [
-                'id' => $u->id,
-                'name' => $u->name,
-                'slug' => $u->slug,
-                'is_public' => (bool) $u->is_public,
-                'avatar' => AvatarCache::urlFor($u->github_login, $u->avatar, 96),
-                'github' => $u->gh_login ?: $u->github_login,
-                'rarity' => $u->rarity,
-                'followers' => $u->followers !== null ? (int) $u->followers : null,
-                'stars' => $u->stars !== null ? (int) $u->stars : null,
-                'updated_at' => $u->updated_at?->diffForHumans(),
-                'key' => "user:{$u->id}",
-            ]);
+            ->map(function (User $u) {
+                // The stat columns come out of the card itself rather than a second set of JSON
+                // extracts in SQL, since the row ships the card anyway to draw its thumbnail.
+                $card = CardPayload::slim(is_array($u->card) ? $u->card : null);
+                $profile = $card['profile'] ?? [];
+
+                return [
+                    'id' => $u->id,
+                    'name' => $u->name,
+                    'slug' => $u->slug,
+                    'is_public' => (bool) $u->is_public,
+                    'avatar' => AvatarCache::urlFor($u->github_login, $u->avatar, 96),
+                    'github' => $profile['login'] ?? $u->github_login,
+                    'rarity' => $card['rarity'] ?? null,
+                    'followers' => isset($profile['followers']) ? (int) $profile['followers'] : null,
+                    'stars' => isset($profile['stars']) ? (int) $profile['stars'] : null,
+                    'updated_at' => $u->updated_at?->diffForHumans(),
+                    'key' => "user:{$u->id}",
+                    // Null for a row whose card has no profile behind it, so the thumbnail can
+                    // fall back rather than render an empty frame.
+                    'card' => ! empty($profile['login']) || ! empty($profile['name']) ? $card : null,
+                ];
+            });
 
         /*
          * Cards generated from the home page by visitors who never signed in (GeneratedCards).
@@ -256,13 +277,14 @@ class AdminController extends Controller
                 'stars' => $g['stars'],
                 'updated_at' => Carbon::createFromTimestamp($g['fetched_at'])->diffForHumans(),
                 'key' => $g['key'],
+                'card' => CardPayload::slim($g['card']),
             ]));
 
         $page = LengthAwarePaginator::resolveCurrentPage();
         $cards = new LengthAwarePaginator(
-            $rows->forPage($page, 10)->values(),
+            $rows->forPage($page, self::CARDS_PER_PAGE)->values(),
             $rows->count(),
-            10,
+            self::CARDS_PER_PAGE,
             $page,
             ['path' => LengthAwarePaginator::resolveCurrentPath()]
         );
@@ -295,8 +317,15 @@ class AdminController extends Controller
             'clear_slug' => $user->update(['slug' => null, 'is_public' => false]),
         };
 
+        $said = [
+            'unpublish' => 'Took down',
+            'publish' => 'Published',
+            'clear_slug' => 'Released the slug of',
+        ][$data['action']];
+
         activity('admin')->causedBy(Auth::user())->performedOn($user)
-            ->log("Admin {$data['action']} on card of user #{$user->id}");
+            ->withProperties(array_filter(['action' => $data['action'], 'slug' => $user->slug]))
+            ->log("{$said} {$user->name}'s card");
 
         return back()->with('success', 'Card updated.');
     }
@@ -428,7 +457,7 @@ class AdminController extends Controller
             );
         }
 
-        activity('admin')->causedBy(Auth::user())->log("Admin saved card asset {$values['category']}/{$values['slug']}");
+        activity('admin')->causedBy(Auth::user())->log("Saved card asset {$values['category']}/{$values['slug']}");
 
         return back()->with('success', 'Asset saved.');
     }
@@ -444,8 +473,12 @@ class AdminController extends Controller
 
     public function deleteAsset(CardAsset $asset)
     {
+        // Logged first, like deleteUser: the subject is about to stop existing, so its identity
+        // has to be read off the live model and written into the description.
+        activity('admin')->causedBy(Auth::user())
+            ->log("Deleted card asset {$asset->category}/{$asset->slug}");
+
         $asset->delete();
-        activity('admin')->causedBy(Auth::user())->log('Admin deleted card asset #'.$asset->id);
 
         return back()->with('success', 'Asset deleted.');
     }
@@ -456,17 +489,26 @@ class AdminController extends Controller
         $log = trim((string) $request->query('log', ''));
 
         $activities = Activity::query()
-            ->select(['id', 'log_name', 'description', 'subject_type', 'subject_id', 'causer_type', 'causer_id', 'created_at'])
-            // Column-scoped: a bare with('causer') hydrates the whole User row, card blob and
-            // email included, once per row, to print one name.
-            ->with('causer:id,name')
+            // `properties` carries the before/after of each change, which activityRow turns into
+            // the detail under the description. Leaving it out of the select silently empties that.
+            ->select(['id', 'log_name', 'description', 'properties', 'subject_type', 'subject_id', 'causer_type', 'causer_id', 'created_at'])
+            // Both relations are column-scoped. A bare `with` hydrates whole User rows, card blob
+            // and email included, once per row, to print one name. `subject` is a morph, so its
+            // constraint goes per related type.
+            ->with(['causer:id,name', 'subject' => fn (MorphTo $m) => $m->constrain([
+                User::class => fn ($q) => $q->select('id', 'name', 'github_login'),
+                CardAsset::class => fn ($q) => $q->select('id', 'category', 'slug'),
+            ])])
             ->when($log !== '', fn ($q) => $q->where('log_name', $log))
             ->when($search !== '', function ($q) use ($search) {
                 $like = '%'.str_replace(['\\', '%', '_'], ['\\\\', '\%', '\_'], $search).'%';
                 $q->where(fn ($w) => $w->where('description', 'like', $like)
                     ->orWhereHasMorph('causer', [User::class], fn ($c) => $c->where('name', 'like', $like)));
             })
-            ->latest()
+            // By id rather than created_at: one admin action can write several entries inside the
+            // same second, and a timestamp sort leaves those in an arbitrary order from page to
+            // page. The id is monotonic, so it is both stable and chronological.
+            ->latest('id')
             ->paginate(10)
             ->withQueryString()
             ->through(fn (Activity $a) => $this->activityRow($a));
@@ -487,15 +529,85 @@ class AdminController extends Controller
 
     private function activityRow(Activity $a): array
     {
+        // `properties` is cast to a Collection by the package, and a plain (array) cast on one of
+        // those yields its internal structure rather than the payload.
+        $properties = collect($a->properties)->toArray();
+
         return [
             'id' => $a->id,
             'log_name' => $a->log_name,
             'description' => $a->description,
-            'subject' => $a->subject_type ? class_basename($a->subject_type).' #'.$a->subject_id : null,
+            'subject' => $this->subjectLabel($a),
             'causer' => $a->causer?->name,
-            // `properties` is not shipped: the table never renders it, and it holds whatever each
-            // logger put there, request payloads included.
+            'changes' => $this->changes($properties),
+            // Only the keys this app sets by hand. The rest of the bag is whatever each logger
+            // put there, so it is not forwarded wholesale.
+            'context' => array_filter(Arr::only($properties, ['slug', 'login', 'key', 'action'])),
             'created_at' => $a->created_at?->diffForHumans(),
         ];
+    }
+
+    /**
+     * Who or what the entry was about, in words.
+     *
+     * Falls back to the stored type and id when the subject has since been deleted, which is why
+     * the delete messages carry the name in their own description too.
+     */
+    private function subjectLabel(Activity $a): ?string
+    {
+        if (! $a->subject_type) {
+            return null;
+        }
+
+        $subject = $a->subject;
+
+        if ($subject instanceof User) {
+            return $subject->github_login ? "{$subject->name} (@{$subject->github_login})" : $subject->name;
+        }
+
+        if ($subject instanceof CardAsset) {
+            return "{$subject->category}/{$subject->slug}";
+        }
+
+        return class_basename($a->subject_type).' #'.$a->subject_id.($subject ? '' : ' (deleted)');
+    }
+
+    /**
+     * Field-level before and after, which is the part that makes this an audit trail rather than a
+     * list of verbs. spatie/laravel-activitylog stores them under `attributes` and `old`.
+     *
+     * @param  array<string, mixed>  $properties
+     * @return array<int, array<string, string>>
+     */
+    private function changes(array $properties): array
+    {
+        $new = (array) ($properties['attributes'] ?? []);
+        $old = (array) ($properties['old'] ?? []);
+
+        $out = [];
+        foreach ($new as $field => $to) {
+            $from = $old[$field] ?? null;
+            if ($from === $to) {
+                continue;
+            }
+            $out[] = [
+                'field' => $field,
+                'from' => $this->readable($from),
+                'to' => $this->readable($to),
+            ];
+        }
+
+        return $out;
+    }
+
+    /** A logged value as one short string, since the column has no room for a nested structure. */
+    private function readable(mixed $value): string
+    {
+        return match (true) {
+            $value === null || $value === '' => 'empty',
+            is_bool($value) => $value ? 'yes' : 'no',
+            is_scalar($value) => Str::limit((string) $value, 40),
+            default => Str::limit(json_encode($value), 40),
+        };
     }
 }

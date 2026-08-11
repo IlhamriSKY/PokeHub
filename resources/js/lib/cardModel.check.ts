@@ -10,12 +10,13 @@
  *   - a subtype the generation does not offer falls back to auto.
  */
 import { buildSections, rollAxes } from '@/components/card-gallery';
-import { elementsForGen, pickerElement, resolveOverrides, rollElement, type Axes } from '@/lib/cardModel';
+import { autoDualType, dualSupported, elementsForGen, pickerElement, resolveOverrides, rollElement, type Axes } from '@/lib/cardModel';
 import type { CardOptions } from '@/lib/options';
 import {
     attackDamage,
     cardHp,
     ELEMENTS,
+    langType,
     matchOf,
     raritiesFromOptions,
     rarityOf,
@@ -484,6 +485,41 @@ const check = (name: string, cond: boolean) => {
     check('rollElement: no card yet -> undefined', rollElement(undefined, undefined) === undefined);
     // An unlisted language still resolves (langType falls back to grass), so it stays rollable.
     check('rollElement: unknown language rolls grass', rollElement(['Brainfuck'], 'water') === 'grass');
+}
+
+// 13. A generated card stores no axes, so its dual type has to come from the second language on
+//     every generation, or it prints one element forever.
+{
+    const GENS = ['1-gen', 'tcg-gen', 'scarlet-violet'];
+
+    // JavaScript -> lightning, Python -> psychic.
+    for (const gen of GENS) {
+        check(`autoDualType: ${gen} takes the second language`, autoDualType(['JavaScript', 'Python'], gen, 'lightning') === 'psychic');
+    }
+
+    check('autoDualType: no second language -> undefined', autoDualType(['JavaScript'], '1-gen', 'lightning') === undefined);
+    check('autoDualType: no languages at all -> undefined', autoDualType(undefined, '1-gen', 'lightning') === undefined);
+    // Two languages that resolve to one element are not a dual card.
+    check(
+        'autoDualType: second language of the same element -> undefined',
+        autoDualType(['Python', 'Jupyter Notebook'], '1-gen', langType('Python')) === undefined,
+    );
+
+    /*
+     * A Shell developer resolves to darkness, which no generation accepts as a dual: Base Set
+     * ships no dark frame at all, and the other two drop Dark from the dual list to match the
+     * reference. So they stay single-typed everywhere rather than rendering a pairing that has no
+     * art behind it.
+     */
+    for (const gen of GENS) {
+        check(`autoDualType: ${gen} drops a dark second type`, autoDualType(['JavaScript', 'Shell'], gen, 'lightning') === undefined);
+    }
+
+    // Every generation must agree with its own picker: whatever comes back has to be legal there.
+    for (const gen of GENS) {
+        const got = autoDualType(['JavaScript', 'Ruby'], gen, 'lightning');
+        check(`autoDualType: ${gen} only returns a dual the generation allows`, got === undefined || dualSupported(gen, got));
+    }
 }
 
 if (failures) throw new Error(`${failures} check(s) FAILED`);

@@ -1,4 +1,5 @@
 import { usePointerTilt } from '@/hooks/usePointerTilt';
+import { autoDualType } from '@/lib/cardModel';
 import { avatarUrl, langType, loreOf, matchOf, type Element, type Generation, type Profile, type Rarity, type Subtype } from '@/lib/rarities';
 import { cn } from '@/lib/utils';
 import * as React from 'react';
@@ -72,9 +73,12 @@ export function PokeCard({
     const ref = usePointerTilt<HTMLDivElement>(idle);
     const type = element ?? langType(d.top_lang);
     const lore = loreOf(d);
-    // Dual type: a distinct secondary element that splits the frame diagonally.
-    const dual = dualType && dualType !== type ? dualType : undefined;
     const gen = (generation ?? '1-gen') as AssetGen;
+    // Dual type: a distinct secondary element that splits the frame diagonally. Falls back to the
+    // profile's second language, which is what gives a generated card two elements. See
+    // autoDualType.
+    const pickedDual = dualType ?? autoDualType(d.langs, gen, type);
+    const dual = pickedDual && pickedDual !== type ? pickedDual : undefined;
     // Per-profile, not per-element: the amounts are era constants, so the TYPES are the only place
     // the bottom row can tell two cards apart. See matchOf.
     const match = matchOf(type as Element, d);

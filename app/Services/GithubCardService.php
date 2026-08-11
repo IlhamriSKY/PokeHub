@@ -204,6 +204,10 @@ class GithubCardService
             'company' => $d['company'], 'location' => $d['location'],
             'blog' => $d['blog'] ?? '', 'twitter' => $d['twitter'] ?? '', 'hireable' => $d['hireable'] ?? false,
             'top_language' => $d['top_lang'], 'languages' => $d['all_langs'] ?? $d['langs'],
+            // Called out separately because the card's SECOND element is derived from it, so a
+            // dual-typed card reads as one thing only if the text knows about both. The mapping
+            // from language to element stays in cardModel.ts; a PHP copy would only drift.
+            'second_language' => $d['langs'][1] ?? null,
             'notable_repos' => $d['top_repos'] ?? [],
             'organizations' => $d['orgs'] ?? [],
             'public_repos' => $d['repos'], 'public_gists' => $d['gists'],
@@ -214,7 +218,12 @@ class GithubCardService
 
         $sys = 'You are a Pokemon TCG card writer. Turn a real GitHub developer into a Pokemon-style '
             .'trading card. GROUND EVERYTHING in the given facts: weave in their top language, a notable '
-            .'repository or project by name, their star/repo/follower counts, and account age. Write like a '
+            .'repository or project by name, their star/repo/follower counts, and account age. '
+            // The card prints an element per language, so a two-language developer is a dual-typed
+            // card. Saying so keeps the written half from describing a single-typed one.
+            .'The printed card takes its element from top_language, and a second element from '
+            .'second_language when there is one, so treat a developer with both as a dual-type '
+            .'Pokemon and let the text carry both. Write like a '
             .'real Pokedex entry and real TCG attacks (evocative, '
             .'a little dramatic, never generic). Reply with ONLY a JSON object (no markdown, no commentary, no '
             .'reasoning) of exactly this shape: '

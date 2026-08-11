@@ -1,18 +1,25 @@
+import { CardZoom } from '@/components/card-zoom';
 import { DataTable, Pagination, Row, type Paginated } from '@/components/data-table';
+import { PokeCard } from '@/components/PokeCard';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import AppLayout from '@/layouts/app-layout';
+import { resolveOverrides, type Axes } from '@/lib/cardModel';
+import { useCardOptions } from '@/lib/options';
+import { raritiesFromOptions, rarityOf, type Profile } from '@/lib/rarities';
 import { type BreadcrumbItem, type SharedData } from '@/types';
 import { Head, Link, router, usePage } from '@inertiajs/react';
-import { EyeOff, Search, Wand2 } from 'lucide-react';
-import { useState } from 'react';
+import { EyeOff, ImageOff, Search, Wand2 } from 'lucide-react';
+import { useCallback, useState } from 'react';
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Admin', href: '/admin' },
     { title: 'Cards', href: '/admin/cards' },
 ];
+
+type CardData = { profile: Profile; rarity: string; axes: Partial<Axes> };
 
 type CardRow = {
     /** "user:12" or "profile:torvalds". Null `id` means the second kind: nobody owns it. */
@@ -27,6 +34,8 @@ type CardRow = {
     followers: number | null;
     stars: number | null;
     updated_at: string | null;
+    /** Null when the stored card has no profile to draw. */
+    card: CardData | null;
 };
 
 const fmt = (n: number | null) => (n === null ? '—' : n >= 1000 ? `${(n / 1000).toFixed(n >= 10000 ? 0 : 1)}k` : String(n));
@@ -44,6 +53,26 @@ export default function AdminCards({
 }) {
     const { flash } = usePage<SharedData>().props;
     const [q, setQ] = useState(filters?.q ?? '');
+    const [zoom, setZoom] = useState<CardRow | null>(null);
+    const closeZoom = useCallback(() => setZoom(null), []);
+    const { options } = useCardOptions();
+    // Distinct from the `rarities` prop above, which is the slug list the filter offers. These are
+    // the full presets the face needs to draw a foil.
+    const rarityPresets = raritiesFromOptions(options);
+
+    /** The card as it really renders, so a moderator judges the thing itself. */
+    const render = (row: CardRow) => {
+        if (!row.card) return null;
+        const rarity = rarityOf(rarityPresets, row.card.rarity);
+
+        return (
+            <PokeCard
+                profile={{ ...row.card.profile, rarity: row.card.rarity }}
+                rarity={rarity}
+                {...resolveOverrides(options, row.card.axes, rarity)}
+            />
+        );
+    };
 
     const go = (params: Record<string, string>) => router.get('/admin/cards', params, { preserveState: true, replace: true });
 
@@ -142,6 +171,7 @@ export default function AdminCards({
                     }
                     head={
                         <>
+                            <th scope="col">Card</th>
                             <th scope="col">Owner</th>
                             <th scope="col">GitHub</th>
                             <th scope="col">Rarity</th>
@@ -155,11 +185,32 @@ export default function AdminCards({
                     }
                     isEmpty={cards.data.length === 0}
                     empty="No cards match this view."
-                    colSpan={7}
+                    colSpan={8}
                     footer={<Pagination page={cards} />}
                 >
                     {cards.data.map((c) => (
                         <Row key={c.key}>
+                            {/* The real card, not the public image route: that one 404s on exactly
+                                the private cards this page exists to moderate. */}
+                            <td className="p-3">
+                                {c.card ? (
+                                    <button
+                                        type="button"
+                                        onClick={() => setZoom(c)}
+                                        aria-label={`View ${c.name}'s card full size`}
+                                        className="focus-visible:ring-ring block w-14 cursor-zoom-in rounded-md transition-transform duration-200 hover:scale-105 focus-visible:ring-2 focus-visible:outline-none"
+                                    >
+                                        {render(c)}
+                                    </button>
+                                ) : (
+                                    <span
+                                        title="This card has no profile data to draw"
+                                        className="bg-muted text-muted-foreground flex h-[76px] w-14 items-center justify-center rounded-md"
+                                    >
+                                        <ImageOff className="h-4 w-4" />
+                                    </span>
+                                )}
+                            </td>
                             <td className="p-3">
                                 <div className="flex items-center gap-2">
                                     {c.avatar && <img src={c.avatar} alt="" className="h-7 w-7 rounded-full" loading="lazy" />}
@@ -227,6 +278,27 @@ export default function AdminCards({
                     ))}
                 </DataTable>
             </div>
+
+            {zoom && (
+                <CardZoom
+                    caption={zoom.name}
+                    sub={zoom.github ? `@${zoom.github}` : undefined}
+                    onClose={closeZoom}
+                    actions={
+                        zoom.is_public && zoom.slug ? (
+                            <Button asChild size="sm" variant="secondary">
+                                <a href={`/${zoom.slug}`} target="_blank" rel="noreferrer">
+                                    {`Open /${zoom.slug}`}
+                                </a>
+                            </Button>
+                        ) : (
+                            <Badge variant="outline">private</Badge>
+                        )
+                    }
+                >
+                    {render(zoom)}
+                </CardZoom>
+            )}
         </AppLayout>
     );
 }
