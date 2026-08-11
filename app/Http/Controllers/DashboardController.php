@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\CardAsset;
 use App\Rules\Turnstile as TurnstileRule;
+use App\Services\AvatarCache;
 use App\Services\GithubCardService;
 use App\Services\RegenQuota;
 use Illuminate\Http\Request;
@@ -51,7 +52,7 @@ class DashboardController extends Controller
         return back();
     }
 
-    public function regenerate(Request $request, GithubCardService $svc)
+    public function regenerate(Request $request, GithubCardService $svc, AvatarCache $avatars)
     {
         // The AI call alone is allowed 120s by config, which is longer than PHP's default
         // max_execution_time. Without this the worker is killed before the model replies.
@@ -154,6 +155,11 @@ class DashboardController extends Controller
                 + ['firstEdition' => (int) ($profile['age_years'] ?? 0) >= self::FIRST_EDITION_YEARS],
         ];
         $user->save();
+
+        // The one moment we KNOW the picture may have changed. GitHub's avatar url is the same
+        // string before and after a new upload (`?v=4` is not a version), so nothing else can tell
+        // AvatarCache to look again inside its weekly TTL.
+        $avatars->forget($login);
 
         activity('card')
             ->causedBy($user)

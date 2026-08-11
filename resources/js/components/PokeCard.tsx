@@ -195,7 +195,7 @@ export function PokeCard({
                                     pearl; the chrome's silver rim frames it. Above the holo because the
                                     whole chrome layer paints after the foil. */}
                                     <img className="pcg-stage-chrome" src={`/img/pcg/tcg-gen/${st}.webp`} alt="" />
-                                    <div className="pcg-evolve-photo" style={{ backgroundImage: `url(${avatarUrl(d.avatar, 96)})` }} />
+                                    <div className="pcg-evolve-photo" style={{ backgroundImage: `url(${avatarUrl(d, 96)})` }} />
                                     <span className="pcg-stage">{stageLabel}</span>
                                     {evolvesFrom && (
                                         <div className="pcg-evolve">

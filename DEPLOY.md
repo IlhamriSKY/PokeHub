@@ -130,6 +130,16 @@ fallback: every format needs the same browser, so a redirect between them would 
 | `/{slug}.svg` | Node + Chromium | 3–5s cold, ms warm | on disk, keyed by card data |
 | `/{slug}.png` | Node + Chromium | 3–5s cold, ms warm | on disk, keyed by card data |
 | `/{slug}.gif` | Node + Chromium | 10–25s cold, ms warm | on disk, keyed by card data |
+| `/avatar/{login}` | outbound HTTPS | ~200ms cold, ms warm | `storage/app/private/avatars/{size}/{login}` |
+
+The avatar route is the card's face, kept locally instead of hot-linked to `avatars.github
+usercontent.com` — that host is not reachable on every network, and it caps its own caching at 300
+seconds, so browsers re-downloaded every face on the page several times an hour. Nothing to warm
+and nothing to prune in practice: a file is ~20KB, only logins already in `profiles` or `users` are
+fetchable, and only at the four sizes the card renders, so the directory is bounded at four small
+files per person on the site. A regenerate drops that person's copies; otherwise they refresh
+themselves weekly. If the server has no outbound HTTPS the route redirects to GitHub and the card
+behaves exactly as it did before the cache existed.
 
 ---
 

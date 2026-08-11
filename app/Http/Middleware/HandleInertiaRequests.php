@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Services\AvatarCache;
 use App\Support\Seo;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Http\Request;
@@ -46,7 +47,12 @@ class HandleInertiaRequests extends Middleware
             'name' => config('app.name'),
             'quote' => ['message' => trim($message), 'author' => trim($author)],
             'auth' => [
-                'user' => $user,
+                // Same treatment the card's face gets (AvatarCache): the header portrait is the
+                // same hot-linked GitHub url, so it went missing on the same networks and expired
+                // out of the browser cache every five minutes on all the rest.
+                'user' => $user ? array_merge($user->toArray(), [
+                    'avatar' => AvatarCache::urlFor($user->github_login, $user->avatar, 96),
+                ]) : null,
                 // Closures: Inertia skips them on a partial reload, saving the permission queries.
                 'roles' => fn () => $user ? $user->getRoleNames() : [],
                 'permissions' => fn () => $user ? $user->getAllPermissions()->pluck('name') : [],

@@ -3,6 +3,7 @@
 use App\Http\Controllers\AdminController;
 use App\Http\Controllers\Api\GithubController;
 use App\Http\Controllers\Api\OptionsController;
+use App\Http\Controllers\AvatarController;
 use App\Http\Controllers\CardImageController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\GenerateCardController;
@@ -10,9 +11,16 @@ use App\Http\Controllers\LandingController;
 use App\Http\Controllers\PublicCardController;
 use App\Http\Controllers\PublicCardsController;
 use App\Http\Controllers\SeoFilesController;
+use App\Http\Middleware\HandleInertiaRequests;
+use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
+use Illuminate\Cookie\Middleware\EncryptCookies;
+use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
+use Illuminate\Http\Middleware\AddLinkHeadersForPreloadedAssets;
 use Illuminate\Http\Request;
+use Illuminate\Session\Middleware\StartSession;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
+use Illuminate\View\Middleware\ShareErrorsFromSession;
 use Inertia\Inertia;
 
 // Public: cached reads keep shared /{slug} links working for logged-out visitors. The generation
@@ -21,6 +29,30 @@ Route::get('api/github', [GithubController::class, 'show'])->middleware('throttl
 // Throttled like every other public endpoint, since this dumps the whole enabled asset table and
 // a browser cache does nothing to a client that ignores it.
 Route::get('api/options', [OptionsController::class, 'index'])->middleware('throttle:60,1');
+
+// The card's face, cached on our own disk (AvatarCache). Two segments, so it cannot collide with
+// the `{slug}` catch-all at the bottom of this file, and public because every card page needs it.
+//
+// Stripped back to a static-file handler. Everything below is in the `web` group because this file
+// is, and every one of them costs something on a route that only ever answers with an image:
+// StartSession is a read AND a write against the database session table on each of the four faces
+// a landing page asks for, and it plus ValidateCsrfToken attach two `Set-Cookie` headers, which
+// stop any shared cache from honouring the `s-maxage` this route sends. HandleInertiaRequests adds
+// a `Vary: X-Inertia` that splits that cache again. Nothing here reads the session - not even the
+// 404, which is a self-contained blade page.
+// SecurityHeaders and SubstituteBindings stay: `nosniff` matters more here than anywhere.
+Route::get('avatar/{login}', [AvatarController::class, 'show'])
+    ->where('login', '[A-Za-z0-9][A-Za-z0-9-]{0,38}')
+    ->withoutMiddleware([
+        EncryptCookies::class,
+        AddQueuedCookiesToResponse::class,
+        StartSession::class,
+        ShareErrorsFromSession::class,
+        ValidateCsrfToken::class,
+        HandleInertiaRequests::class,
+        AddLinkHeadersForPreloadedAssets::class,
+    ])
+    ->name('avatar');
 
 Route::get('/', [LandingController::class, 'index'])->name('home');
 

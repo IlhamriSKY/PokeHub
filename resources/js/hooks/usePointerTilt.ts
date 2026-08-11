@@ -1,3 +1,4 @@
+import { deviceTiltPossible, onDeviceTilt, requestDeviceTilt, type Tilt } from '@/lib/deviceTilt';
 import { useEffect, useRef } from 'react';
 
 const round = (v: number, p = 3) => parseFloat(v.toFixed(p));
@@ -13,6 +14,15 @@ const SWEEP_X = 30;
 const SWEEP_Y = 18;
 
 /**
+ * How long a touch keeps the gyro out, and how long a reading counts as "the handset is driving".
+ *
+ * A finger dragging across the card also swings the phone about, so without this the two inputs
+ * fight over the same custom properties and the foil stutters. Long enough to cover the moment
+ * after lifting off, when the hand is still settling.
+ */
+const TOUCH_HOLD_MS = 800;
+
+/**
  * Attach to the outer `.card` element. Tracks the pointer and writes the CSS
  * custom properties (position, tilt, glare) that the holo stylesheet reads.
  *
@@ -20,6 +30,11 @@ const SWEEP_Y = 18;
  * take turns rather than moving together: each one owns a slot in a cycle, and
  * because every slot is measured from the same clock they sequence themselves
  * without needing to talk to each other.
+ *
+ * On a phone the same properties are driven by the device's own tilt instead (see
+ * {@link onDeviceTilt}): the card leans the way you lean the handset. Three inputs, in order of
+ * precedence - a real pointer, then the gyro, then the idle sweep. Each one only takes over when
+ * the one above it is absent, so no frame is ever written twice.
  */
 export function usePointerTilt<T extends HTMLElement>(idle?: { index: number; count: number }) {
     const ref = useRef<T>(null);
@@ -34,7 +49,17 @@ export function usePointerTilt<T extends HTMLElement>(idle?: { index: number; co
 
         let raf: number | null = null;
         let pending: Record<string, number> | null = null;
+        let touchedAt = 0;
+        /** When the sensor last reported, whether or not that reading was painted. */
+        let tiltedAt = 0;
         const set = (k: string, v: string) => card.style.setProperty(k, v);
+
+        /**
+         * Is the handset currently driving this card? Measured on the readings themselves rather
+         * than on "did we subscribe": iOS can refuse the motion permission after we have, and a
+         * card left frozen waiting for a sensor that never reports is worse than no gyro at all.
+         */
+        const tilting = () => Date.now() - tiltedAt < TOUCH_HOLD_MS * 2;
 
         /** The same shape a real pointer at (px, py) would produce. */
         const frameFor = (px: number, py: number) => {
@@ -54,15 +79,19 @@ export function usePointerTilt<T extends HTMLElement>(idle?: { index: number; co
             };
         };
 
+        /** Both live inputs land here: everything downstream only knows about a point on the card. */
+        const queue = (px: number, py: number) => {
+            pending = frameFor(px, py);
+            if (raf === null) raf = requestAnimationFrame(apply);
+        };
+
         const onMove = (e: PointerEvent | TouchEvent) => {
             const rect = rotator.getBoundingClientRect();
             const t = (e as TouchEvent).touches?.[0];
+            if (t) touchedAt = Date.now();
             const clientX = t ? t.clientX : (e as PointerEvent).clientX;
             const clientY = t ? t.clientY : (e as PointerEvent).clientY;
-            const px = clamp(round((100 / rect.width) * (clientX - rect.left)));
-            const py = clamp(round((100 / rect.height) * (clientY - rect.top)));
-            pending = frameFor(px, py);
-            if (raf === null) raf = requestAnimationFrame(apply);
+            queue(clamp(round((100 / rect.width) * (clientX - rect.left))), clamp(round((100 / rect.height) * (clientY - rect.top))));
         };
 
         const apply = () => {
@@ -107,23 +136,66 @@ export function usePointerTilt<T extends HTMLElement>(idle?: { index: number; co
                 card.style.removeProperty(p);
         };
 
+        const onTouchEnd = () => {
+            touchedAt = Date.now();
+            // The one gesture on the card itself, which is where iOS wants the motion prompt to
+            // come from. No-ops after the first answer, and on every other platform.
+            requestDeviceTilt();
+            // Only hand the card back to its resting CSS if nothing else is about to drive it.
+            // With a live sensor that reset would blank the foil for TOUCH_HOLD_MS and then snap
+            // straight back into the tilt pose - two jumps where the tilt alone makes zero.
+            if (!tilting()) onLeave();
+        };
+
         rotator.addEventListener('pointermove', onMove);
         rotator.addEventListener('pointerleave', onLeave);
         rotator.addEventListener('touchmove', onMove, { passive: true });
-        rotator.addEventListener('touchend', onLeave);
+        rotator.addEventListener('touchend', onTouchEnd);
+
+        /*
+         * The gyro drives EVERY card on the page at once, so an off-screen one has to cost nothing:
+         * a phone painting five holo cards a frame while four of them are scrolled away is how this
+         * turns into jank. `onScreen` gates the writes; the subscription itself is one shared
+         * listener regardless (deviceTilt.ts).
+         */
+        let onScreen = true;
+        let observer: IntersectionObserver | undefined;
+        let unsubscribe: (() => void) | undefined;
+
+        if (deviceTiltPossible()) {
+            const onTilt = ({ x, y }: Tilt) => {
+                tiltedAt = Date.now();
+                if (!onScreen || Date.now() - touchedAt < TOUCH_HOLD_MS) return;
+                queue(clamp(round(50 + x * 50)), clamp(round(50 + y * 50)));
+            };
+
+            observer = new IntersectionObserver(
+                ([entry]) => {
+                    onScreen = entry.isIntersecting;
+                    // Hand the card back to its resting CSS on the way out, or it freezes mid-lean
+                    // at whatever angle it held when it left the screen.
+                    if (!onScreen) onLeave();
+                },
+                { rootMargin: '10%' },
+            );
+            observer.observe(card);
+            unsubscribe = onDeviceTilt(onTilt);
+        }
 
         let idleRaf: number | null = null;
         let hovered = false;
+        let onEnter: (() => void) | undefined;
+        let onExit: (() => void) | undefined;
 
         if (idleCount > 0 && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
             const slot = SWEEP_MS + GAP_MS;
             const cycle = slot * idleCount;
             const start = idleIndex * slot;
 
-            const onEnter = () => {
+            onEnter = () => {
                 hovered = true;
             };
-            const onExit = () => {
+            onExit = () => {
                 hovered = false;
             };
             rotator.addEventListener('pointerenter', onEnter);
@@ -133,8 +205,10 @@ export function usePointerTilt<T extends HTMLElement>(idle?: { index: number; co
 
             const tick = () => {
                 idleRaf = requestAnimationFrame(tick);
-                // A real pointer always wins; its own handlers own the card while it is there.
-                if (hovered) {
+                // A real pointer always wins, and so does the handset's own tilt: both are someone
+                // actually moving the card, and their handlers own it while they are there. No
+                // onLeave here - whoever is driving has already written this frame.
+                if (hovered || tilting()) {
                     animating = false;
 
                     return;
@@ -180,25 +254,21 @@ export function usePointerTilt<T extends HTMLElement>(idle?: { index: number; co
             };
 
             idleRaf = requestAnimationFrame(tick);
-
-            return () => {
-                rotator.removeEventListener('pointermove', onMove);
-                rotator.removeEventListener('pointerleave', onLeave);
-                rotator.removeEventListener('touchmove', onMove);
-                rotator.removeEventListener('touchend', onLeave);
-                rotator.removeEventListener('pointerenter', onEnter);
-                rotator.removeEventListener('pointerleave', onExit);
-                if (raf !== null) cancelAnimationFrame(raf);
-                if (idleRaf !== null) cancelAnimationFrame(idleRaf);
-            };
         }
 
+        // One cleanup for all three inputs. The idle branch used to carry its own copy of the
+        // teardown, which is how a listener gets left behind the next time one of them grows one.
         return () => {
             rotator.removeEventListener('pointermove', onMove);
             rotator.removeEventListener('pointerleave', onLeave);
             rotator.removeEventListener('touchmove', onMove);
-            rotator.removeEventListener('touchend', onLeave);
+            rotator.removeEventListener('touchend', onTouchEnd);
+            if (onEnter) rotator.removeEventListener('pointerenter', onEnter);
+            if (onExit) rotator.removeEventListener('pointerleave', onExit);
+            observer?.disconnect();
+            unsubscribe?.();
             if (raf !== null) cancelAnimationFrame(raf);
+            if (idleRaf !== null) cancelAnimationFrame(idleRaf);
         };
     }, [idleIndex, idleCount]);
 

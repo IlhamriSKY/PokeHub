@@ -76,13 +76,14 @@ Card images additionally need a headless Chromium on the machine. See [DEPLOY.md
 
 Laravel 12, Inertia, React 19, Tailwind v4 and shadcn/ui.
 
-| Where                           | What                                                     |
-| ------------------------------- | -------------------------------------------------------- |
-| `app/Services/`                 | GitHub fetch, AI text, card capture, quotas              |
-| `resources/js/lib/cardModel.ts` | which options are legal on which card                    |
-| `resources/css/pcg.css`         | the card faces, measured against the reference generator |
-| `public/holo.css`               | the holographic foil                                     |
-| `scripts/capture-card.mjs`      | headless Chromium capture behind the image routes        |
+| Where                            | What                                                     |
+| -------------------------------- | -------------------------------------------------------- |
+| `app/Services/`                  | GitHub fetch, AI text, card capture, avatars, quotas     |
+| `resources/js/lib/cardModel.ts`  | which options are legal on which card                    |
+| `resources/js/lib/deviceTilt.ts` | the handset's tilt, driving the foil on a phone          |
+| `resources/css/pcg.css`          | the card faces, measured against the reference generator |
+| `public/holo.css`                | the holographic foil                                     |
+| `scripts/capture-card.mjs`       | headless Chromium capture behind the image routes        |
 
 Card options are database rows, editable from the admin card lab at `/admin/lab`, rather than
 hardcoded lists.

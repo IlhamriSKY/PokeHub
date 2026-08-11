@@ -422,6 +422,42 @@
     font-size: 2.8cqw;
     color: #222;
 }
+/* Optical centring for the two AMOUNTS, the same correction the SV row already carries and for the
+   same reason. Their line boxes ARE centred - measured at 300px card width, the `.pcg-wk-amt` box
+   centres 0.008px off the emblem's - but "x2" and "-30" are all cap-height and digits with no
+   descender, so the INK hangs in the top of that box: scanning the rendered pixels put both ink
+   centres 1.97px ABOVE the emblem discs (which sit dead on the row's centreline at 450.05). Next
+   to a disc that IS centred, that reads as the numbers floating.
+   1.97px at the row's 2.8cqw (8.4px there) is 0.235em, and em keeps it proportional at every card
+   size. Scoped to .gen-1-gen: tcg-gen and SV have their own amount rules, tuned against their own
+   baked pills, and neither prints a resistance at all.
+
+   A nudge this size cannot actually hold, though, and the @supports block below is the real fix.
+   Glyphs are painted on whole pixels while the emblem's centre slides continuously with the card,
+   so the offset the eye sees is the nudge PLUS a rounding error that depends on how wide the card
+   happens to be. Measured across 13 widths from 220px to 620px, this rule alone lands anywhere
+   from 0.44px high to 1.27px low - the card page is near-perfect at -0.11px while the zoom overlay
+   (~400px) and the capture sizes drop a full pixel, which is exactly the "text sits below the
+   ball" that keeps coming back at some sizes and not others. */
+.gen-1-gen .pcg-wk-amt,
+.gen-1-gen .pcg-res-amt {
+    position: relative;
+    top: 0.235em;
+}
+/* Trim the box to the CAP, and there is nothing left to nudge: the amount's box becomes exactly
+   the ink it holds, so the flex row centres the glyphs themselves against the emblem instead of
+   centring a line box the glyphs happen to hang in the top of. Same rounding, but now it lands on
+   the same thing the ball is centred against rather than on a box a couple of pixels taller.
+   Over the same 13 widths this cuts the worst case from 1.27px to 0.67px and the average error to
+   -0.04px, with no constant to keep re-tuning.
+   Chromium and Safari have it; the declaration above is what Firefox still gets. */
+@supports (text-box: trim-both cap alphabetic) {
+    .gen-1-gen .pcg-wk-amt,
+    .gen-1-gen .pcg-res-amt {
+        text-box: trim-both cap alphabetic;
+        top: 0;
+    }
+}
 /* Traced down the middle 70% of normal-basic.webp: the printed box's rules sit at y88.71-89.14%
    and y94.00-94.43%, so its interior is 89.14-94.00% - 4.86% of card height. Two lines at
    2.3cqw x 1.15 line-height are 5.29cqw = 3.78% of height, so centring them in that interior

@@ -354,7 +354,27 @@ export const fmt = (n: number) => {
     return String(n);
 };
 
-export const avatarUrl = (u: string, s: number) => (!u ? '' : u + (u.includes('?') ? '&' : '?') + 's=' + s);
+/**
+ * The card's face, addressed through OUR origin rather than GitHub's CDN (App\Services\AvatarCache).
+ *
+ * It used to hand `<img>` the raw `avatars.githubusercontent.com` url, which made the picture on
+ * every card depend on a host the visitor's network may not reach - and GitHub caps its own avatar
+ * caching at 300 seconds, so browsers re-downloaded all four faces on the landing page every five
+ * minutes. `/avatar/{login}` is same-origin, cached for a day, and served from disk.
+ *
+ * `s` only ever takes the sizes AvatarCache stores; anything else silently becomes 360 there.
+ * A profile with no avatar at all still returns '' rather than a url that can only 404.
+ *
+ * Lower-cased for the same reason the public card page lower-cases its canonical slug: the stored
+ * login keeps its display casing ("IlhamriSKY"), the cache file does not, and two spellings of one
+ * address are two entries in every browser and proxy cache between here and the visitor.
+ */
+export const avatarUrl = (d: Pick<Profile, 'avatar' | 'login'>, s: number) =>
+    !d.avatar
+        ? ''
+        : d.login
+          ? `/avatar/${encodeURIComponent(d.login.toLowerCase())}?s=${s}`
+          : d.avatar + (d.avatar.includes('?') ? '&' : '?') + 's=' + s;
 
 export function loreOf(d: Profile): Lore {
     if (d.ai && d.ai.flavor) return d.ai;

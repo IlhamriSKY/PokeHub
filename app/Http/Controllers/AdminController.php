@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\CardAsset;
 use App\Models\Profile;
 use App\Models\User;
+use App\Services\AvatarCache;
 use App\Services\CardSettingsService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -85,7 +86,7 @@ class AdminController extends Controller
         $search = trim((string) $request->query('q', ''));
 
         $users = User::query()
-            ->select(['id', 'name', 'email', 'slug', 'is_public', 'avatar', 'created_at'])
+            ->select(['id', 'name', 'email', 'slug', 'is_public', 'avatar', 'github_login', 'created_at'])
             // `card` is a MySQL json column and cannot be compared against a string literal, since
             // '' is not valid JSON text. IS NOT NULL is the whole test.
             ->selectRaw('(card IS NOT NULL) as has_card')
@@ -103,7 +104,8 @@ class AdminController extends Controller
                 'email' => $u->email,
                 'slug' => $u->slug,
                 'is_public' => (bool) $u->is_public,
-                'avatar' => $u->avatar,
+                // Through our own cache like every other face on the site - see AvatarCache.
+                'avatar' => AvatarCache::urlFor($u->github_login, $u->avatar, 96),
                 'roles' => $u->getRoleNames(),
                 'has_card' => (bool) $u->has_card,
                 'created_at' => $u->created_at?->toDateString(),
@@ -170,6 +172,10 @@ class AdminController extends Controller
         if ($user->hasRole('admin') && $this->adminCount() <= 1) {
             return back()->with('error', 'This is the last admin. Deleting it would lock everyone out of this panel.');
         }
+        // Their face is a copy of a real person's photograph sitting on our disk. Deleting the
+        // account and keeping it would be the wrong half of the job - and nothing else would ever
+        // clean it up, because AvatarCache only ever refreshes a login it can still resolve.
+        app(AvatarCache::class)->forget((string) $user->github_login);
         $user->delete();
         activity('admin')->causedBy(Auth::user())->log('Admin deleted user #'.$user->id);
 
@@ -213,7 +219,7 @@ class AdminController extends Controller
                 'name' => $u->name,
                 'slug' => $u->slug,
                 'is_public' => (bool) $u->is_public,
-                'avatar' => $u->avatar,
+                'avatar' => AvatarCache::urlFor($u->github_login, $u->avatar, 96),
                 'github' => $u->gh_login ?: $u->github_login,
                 'rarity' => $u->rarity,
                 'followers' => $u->followers !== null ? (int) $u->followers : null,

@@ -172,7 +172,7 @@ export function PcgFace({
     if (gen === '1-gen' && variant === 'trainer') {
         return (
             <div className="pcg gen-1-gen pcg-trainer">
-                <img className="pcg-photo" src={avatarUrl(d.avatar, 360)} alt={d.login} loading="lazy" />
+                <img className="pcg-photo" src={avatarUrl(d, 360)} alt={d.login} loading="lazy" />
                 <img className="pcg-frame" src="/img/pcg/1-gen/trainer.webp" alt="" />
                 {effectUrls?.map((u, i) => <img key={`${u}-${i}`} className="pcg-effect" src={u} alt="" />)}
                 <span className="pcg-trainer-name">{displayName}</span>
@@ -210,7 +210,7 @@ export function PcgFace({
         const trFrame = fa ? '/img/pcg/tcg-gen/trainer-full-art.webp' : `/img/pcg/tcg-gen/trainer-${trSub}.webp`;
         return (
             <div className={`pcg gen-tcg-gen pcg-tcg-trainer ${fa ? 'is-fullbleed tcg-tr-fa' : ''}`}>
-                <img className="pcg-photo" src={avatarUrl(d.avatar, 360)} alt={d.login} loading="lazy" />
+                <img className="pcg-photo" src={avatarUrl(d, 360)} alt={d.login} loading="lazy" />
                 <img className="pcg-frame" src={trFrame} alt="" />
                 {effectUrls?.map((u, i) => <img key={`${u}-${i}`} className="pcg-effect" src={u} alt="" />)}
                 {/* Trainer Full Art's holo-border asset has a transparent centre (no baked header/footer),
@@ -279,7 +279,7 @@ export function PcgFace({
     return (
         <div className={`pcg gen-${gen} ${dual ? 'has-dual' : ''} ${isStage ? 'is-stage' : ''} ${tcgFullArt ? 'is-fullbleed tcg-full-art' : ''}`}>
             {/* avatar sits BEHIND the frame; the frame's photo window is transparent */}
-            <img className="pcg-photo" src={avatarUrl(d.avatar, 360)} alt={d.login} loading="lazy" />
+            <img className="pcg-photo" src={avatarUrl(d, 360)} alt={d.login} loading="lazy" />
             <img className="pcg-frame" src={tcgFullArt ? '/img/pcg/tcg-gen/full-art.webp' : frameUrl(gen, type, isStage)} alt="" />
             {dual && !tcgFullArt && <img className="pcg-frame pcg-frame2" src={frameUrl(gen, dual, isStage)} alt="" />}
             {frameOverlayUrl && <img className="pcg-frame pcg-frame-overlay" src={frameOverlayUrl} alt="" />}
@@ -354,7 +354,7 @@ export function PcgFace({
                 only when a name exists. */}
             {((gen === '1-gen' && isStage) || (evolvesFrom && !(gen === 'tcg-gen' && isStage))) && (
                 <div className="pcg-evolve">
-                    <img src={avatarUrl(d.avatar, 64)} alt="" />
+                    <img src={avatarUrl(d, 64)} alt="" />
                     {evolvesFrom && (
                         <span>
                             <em>Evolves from</em>
@@ -411,7 +411,11 @@ export function PcgFace({
                         (match.resist ? (
                             <>
                                 <Emblem t={match.resist} />
-                                {resistanceAmount()}
+                                {/* Wrapped so the amount can be nudged onto the row's optical
+                                    centreline like the weakness one (pcg.css .pcg-res-amt). It was
+                                    already an anonymous flex item of the inline-flex cell, so the
+                                    span changes no layout - only gives CSS something to hold. */}
+                                <span className="pcg-res-amt">{resistanceAmount()}</span>
                             </>
                         ) : (
                             '—'
