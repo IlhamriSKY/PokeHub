@@ -8,10 +8,10 @@ use Illuminate\Support\Facades\Log;
 use Throwable;
 
 /**
- * `GET /{slug}.gif` and `GET /{slug}.svg` - the card as an embeddable image for a README.
+ * `GET /{slug}.{gif,svg,png}`: the card as an embeddable image for a README or a link preview.
  *
- * One controller for both: they differ only in the extension they ask CardCapture for, and the
- * MIME they answer with.
+ * One controller for all three, since they differ only in the extension they ask CardCapture for
+ * and the MIME they answer with.
  */
 class CardImageController extends Controller
 {
@@ -25,12 +25,11 @@ class CardImageController extends Controller
         abort_if(! $found, 404);
 
         try {
-            // No URL argument on purpose: CardCapture derives the page it browses from APP_URL,
-            // so a spoofed Host cannot redirect the screenshot at someone else's site.
+            // No URL argument: CardCapture derives the page it browses from APP_URL, so a spoofed
+            // Host cannot point the screenshot at someone else's site.
             $path = $capture->ensure($slug, $found['card'], $format);
         } catch (Throwable $e) {
-            // Both formats need Chromium, so there is no lighter fallback to serve - a 502 with a
-            // logged reason is honest, where a redirect between them would just loop.
+            // Every format needs Chromium, so there is no lighter fallback to serve.
             Log::warning('card capture failed', ['slug' => $slug, 'format' => $format, 'error' => $e->getMessage()]);
 
             abort(502, 'Card image could not be rendered.');

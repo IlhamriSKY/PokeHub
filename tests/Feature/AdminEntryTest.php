@@ -61,6 +61,28 @@ class AdminEntryTest extends TestCase
         $this->get('/admin/users')->assertRedirect('/login');
     }
 
+    /**
+     * The card list pulls its columns out of the `card` JSON in SQL, and the JSON functions differ
+     * between drivers. Hand-written MySQL here fails on any other connection.
+     */
+    public function test_the_card_list_reads_its_json_columns_on_any_driver()
+    {
+        User::factory()->create([
+            'slug' => 'ash',
+            'github_login' => 'ash',
+            'card' => ['rarity' => 'secret', 'profile' => ['login' => 'ash', 'followers' => 12, 'stars' => 34]],
+        ]);
+
+        $this->actingAs($this->admin())
+            ->get('/admin/cards')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page->component('admin/cards')
+                ->where('cards.data.0.rarity', 'secret')
+                ->where('cards.data.0.github', 'ash')
+                ->where('cards.data.0.followers', 12)
+                ->where('cards.data.0.stars', 34));
+    }
+
     public function test_admin_index_route_name_still_resolves_to_admin()
     {
         $this->assertSame(url('/admin'), route('admin.index'));

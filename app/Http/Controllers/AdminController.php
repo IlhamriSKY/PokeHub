@@ -15,16 +15,14 @@ use Spatie\Activitylog\Models\Activity;
 use Spatie\Permission\Models\Role;
 
 /**
- * Admin dashboard. Role-gated (role:admin). Manages users + their public slugs,
- * card assets (the DB-driven Card Lab options, ported from api/admin.php), and
- * shows the activity log.
+ * Admin dashboard, gated on the `admin` role. Manages users and their public slugs, the card
+ * assets behind the card lab's options, and the activity log.
  */
 class AdminController extends Controller
 {
     private const CATEGORIES = ['generation', 'element', 'variant', 'frame', 'effect', 'glare', 'rarity', 'rarity_preset', 'subtype', 'icon', 'tag', 'badge'];
 
-    // The card lab: restyle any card, including the four on the landing page. Admin-only work,
-    // so it lives here rather than on the user dashboard.
+    /** The card lab: restyle any card, including the ones on the landing page. */
     public function lab(Request $request, CardSettingsService $settings)
     {
         return Inertia::render('admin/lab', [
@@ -40,8 +38,8 @@ class AdminController extends Controller
         $data = $request->validate([
             'key' => ['required', 'string', 'regex:/^(user|showcase):\d+$/'],
             'rarity' => ['required', 'string', 'max:40'],
-            // `present`, not `required`: a card with default styling has an EMPTY axes blob, and
-            // `required` rejects an empty array - which made a fresh card impossible to save.
+            // `present` rather than `required`, since a card with default styling has an empty
+            // axes blob and `required` rejects an empty array.
             'axes' => ['present', 'array'],
             'text' => ['nullable', 'array'],
             'text.name' => ['required_with:text', 'string', 'max:60'],
@@ -58,7 +56,7 @@ class AdminController extends Controller
 
         abort_unless($settings->save($data['key'], $data['axes'], $data['rarity'], $data['text'] ?? null), 404);
 
-        // Key only: the log is an audit trail, not a copy of every payload that passed through.
+        // The key only: this is an audit trail, not a copy of every payload that passed through.
         activity('admin')->causedBy(Auth::user())->withProperties(['key' => $data['key']])->log("Restyled card {$data['key']}");
 
         return back()->with('success', 'Card settings saved.');
@@ -74,27 +72,22 @@ class AdminController extends Controller
                 'cached_profiles' => Profile::count(),
                 'activities' => Activity::count(),
             ],
-            // Constrained like the activity page: a bare with('causer') hydrates whole User rows,
-            // card blob and e-mail included, to print eight names.
+            // Column-scoped like the activity page: a bare with('causer') would hydrate whole User
+            // rows, card blob and email included, to print eight names.
             'recent_activity' => Activity::with('causer:id,name')->latest()->limit(8)->get()->map(fn ($a) => $this->activityRow($a)),
         ]);
     }
 
     public function users(Request $request)
     {
-        /*
-         * Paginated and column-scoped. This was `User::with('roles')->get()` - an unbounded
-         * SELECT * that pulled every row's `card` JSON (a whole authored card: profile, moves,
-         * lore) out of the DB and threw it away after an `! empty()` test, while shipping every
-         * user's e-mail to the browser. At a few hundred users that is megabytes of Inertia prop
-         * per page view. `has_card` is now decided in SQL, so the blob never leaves the database.
-         */
+        // Paginated and column-scoped, so the `card` JSON never leaves the database: `has_card` is
+        // decided in SQL rather than by hydrating a whole authored card per row.
         $search = trim((string) $request->query('q', ''));
 
         $users = User::query()
             ->select(['id', 'name', 'email', 'slug', 'is_public', 'avatar', 'created_at'])
-            // `card` is a MySQL json column, so it must NOT be compared against a string literal
-            // ('' is not valid JSON text and the comparison errors). IS NOT NULL is the whole test.
+            // `card` is a MySQL json column and cannot be compared against a string literal, since
+            // '' is not valid JSON text. IS NOT NULL is the whole test.
             ->selectRaw('(card IS NOT NULL) as has_card')
             ->with('roles:id,name')
             ->when($search !== '', fn ($q) => $q->where(fn ($w) => $w
@@ -131,8 +124,7 @@ class AdminController extends Controller
             'slug' => [
                 'nullable', 'string', 'min:3', 'max:40', 'regex:/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/',
                 Rule::unique('users', 'slug')->ignore($user->id),
-                // Shared with sign-up: this list used to be a second, staler copy that had never
-                // heard of /cards, so an admin could hand out a slug that shadows a real route.
+                // Shared with sign-up, so an admin cannot hand out a slug that shadows a route.
                 Rule::notIn(User::RESERVED_SLUGS),
             ],
             'is_public' => ['boolean'],
@@ -141,20 +133,17 @@ class AdminController extends Controller
         ]);
 
         /*
-         * Refuse a role change that would leave the install with NO admin. Nothing stopped an
-         * admin from clearing their own admin role (or the last other admin's), and the panel is
-         * the only place roles can be edited - so that was a one-click, unrecoverable lockout
-         * needing a DB edit to undo. deleteUser has the same guard below.
-         */
-        /*
-         * `roles` is optional, so a PUT that simply omits the key used to reach
-         * syncRoles([]) and strip every role from the target. Absent must mean "leave roles
-         * alone"; only an explicitly sent array may change them.
+         * `roles` is optional, so an absent key means "leave roles alone"; only an explicitly sent
+         * array may change them. Without this a PUT that omits the key strips every role.
+         *
+         * The guard then refuses any change that would leave the install with no admin at all.
+         * This panel is the only place roles can be edited, so that lockout needs a database edit
+         * to undo. deleteUser carries the same guard.
          */
         $newRoles = $request->has('roles') ? ($data['roles'] ?? []) : $user->getRoleNames()->all();
         if ($user->hasRole('admin') && ! in_array('admin', $newRoles, true) && $this->adminCount() <= 1) {
             throw ValidationException::withMessages([
-                'roles' => 'This is the last admin - removing the admin role would lock everyone out of this panel.',
+                'roles' => 'This is the last admin. Removing the admin role would lock everyone out of this panel.',
             ]);
         }
 
@@ -177,10 +166,9 @@ class AdminController extends Controller
         if ($user->id === Auth::id()) {
             return back()->with('error', 'You cannot delete your own account.');
         }
-        // Same lockout guard as updateUser: deleting the last admin leaves nobody able to sign in
-        // here, and the panel is the only place roles can be granted.
+        // Same lockout guard as updateUser.
         if ($user->hasRole('admin') && $this->adminCount() <= 1) {
-            return back()->with('error', 'This is the last admin - deleting it would lock everyone out of this panel.');
+            return back()->with('error', 'This is the last admin. Deleting it would lock everyone out of this panel.');
         }
         $user->delete();
         activity('admin')->causedBy(Auth::user())->log('Admin deleted user #'.$user->id);
@@ -189,12 +177,11 @@ class AdminController extends Controller
     }
 
     /**
-     * The generated CARDS - the app's actual artifact, and until now invisible to admins.
-     * Lists every user who has authored one, with its rarity, share state and the GitHub handle it
-     * was generated from, so a public slug can be reviewed and taken down.
+     * Every user who has a card, with its rarity, share state and originating GitHub handle, so a
+     * public slug can be reviewed and taken down.
      *
-     * The `card` JSON blob is NEVER selected: the two fields the list needs (rarity, github login)
-     * are pulled out in SQL, so a page of 25 cards costs a few hundred bytes instead of megabytes.
+     * The `card` blob is never selected. The handful of fields the list needs are extracted in
+     * SQL, which keeps a page to a few hundred bytes rather than megabytes.
      */
     public function cards(Request $request)
     {
@@ -203,10 +190,14 @@ class AdminController extends Controller
 
         $cards = User::query()
             ->select(['id', 'name', 'email', 'slug', 'is_public', 'avatar', 'github_login', 'updated_at'])
-            ->selectRaw("JSON_UNQUOTE(JSON_EXTRACT(card, '$.rarity')) as rarity")
-            ->selectRaw("JSON_UNQUOTE(JSON_EXTRACT(card, '$.profile.login')) as gh_login")
-            ->selectRaw("JSON_EXTRACT(card, '$.profile.followers') as followers")
-            ->selectRaw("JSON_EXTRACT(card, '$.profile.stars') as stars")
+            // JSON selectors rather than raw SQL, so the grammar emits whatever the driver needs.
+            // Written out by hand this is MySQL-only, and the JSON functions differ per driver.
+            ->addSelect([
+                'card->rarity as rarity',
+                'card->profile->login as gh_login',
+                'card->profile->followers as followers',
+                'card->profile->stars as stars',
+            ])
             ->whereNotNull('card')
             ->when($only === 'public', fn ($q) => $q->where('is_public', true)->whereNotNull('slug'))
             ->when($only === 'private', fn ($q) => $q->where(fn ($w) => $w->where('is_public', false)->orWhereNull('slug')))
@@ -240,10 +231,7 @@ class AdminController extends Controller
         ]);
     }
 
-    /**
-     * Take a public card down (or restore it). Moderation for an abusive public slug - previously
-     * an admin could only reach this by hand-editing the user row.
-     */
+    /** Take a public card down, or restore it. Moderation for an abusive public slug. */
     public function moderateCard(Request $request, User $user)
     {
         $data = $request->validate([
@@ -294,20 +282,18 @@ class AdminController extends Controller
             'label' => ['nullable', 'string', 'max:128'],
             'generation' => ['nullable', 'string', 'max:64'],
             /*
-             * Constrained to a same-origin path or an https URL. This value is handed to EVERY
-             * visitor by the public, unauthenticated /api/options.php and rendered straight into
-             * an <img src>, so an unvalidated free string let the card lab point at arbitrary
-             * third-party origins (silent request/referer leakage of every viewer) or at
-             * `javascript:`/`data:` payloads. A leading `//` is rejected too - that is
-             * protocol-relative and escapes the origin just as effectively as a full URL.
+             * A same-origin path or an https URL, nothing else. Every visitor is handed this value
+             * by the public options endpoint and it renders straight into an <img src>, so a free
+             * string would let the card lab point at third-party origins (leaking every viewer's
+             * request) or at `javascript:`/`data:` payloads. A leading `//` is rejected too, since
+             * protocol-relative URLs escape the origin just as effectively.
              */
             'asset_url' => ['nullable', 'string', 'max:255', 'regex:#^(?:/(?!/)(?!.*\.\.)[\w\-./]*|https://[\w\-.]+(?::\d+)?/(?!.*\.\.)[\w\-./%]*)$#'],
             'sort_order' => ['nullable', 'integer'],
             'enabled' => ['boolean'],
-            // meta carries the load-bearing keys (glare.dr drives the holo engine;
-            // rarity_preset.dr/tier/era/full/... drive the gallery), so malformed JSON must
-            // FAIL here. It used to fall through to `null` below, which silently wiped the
-            // row's meta on a typo and killed that option's foil with no error shown.
+            // meta carries load-bearing keys: glare.dr drives the holo engine and the
+            // rarity_preset keys drive the gallery. Malformed JSON has to fail here, because
+            // falling through to null would wipe the row's meta on a typo with no error shown.
             'meta' => ['nullable', function ($attr, $value, $fail) {
                 if (! is_string($value) || trim($value) === '') {
                     return;
@@ -317,8 +303,8 @@ class AdminController extends Controller
                     $fail('Meta must be valid JSON (e.g. {"dr":"rare holo"}).');
                 }
             }],
-            // SVG is deliberately NOT allowed: it is an executable document (inline <script>,
-            // onload=, xlink:href) served same-origin from public/, i.e. stored XSS with session
+            // SVG is not allowed: it is an executable document (inline <script>, onload=,
+            // xlink:href) served same-origin from public/, which is stored XSS with session
             // access. Card assets are raster art, so nothing needs it.
             'file' => ['nullable', 'file', 'mimes:webp,png,jpg,jpeg,gif', 'max:4096'],
         ]);
@@ -326,23 +312,21 @@ class AdminController extends Controller
         $slug = trim($data['slug']);
         $assetUrl = $data['asset_url'] ?? '';
 
-        // Upload -> public/img/uploads/<category>/<slug>.<ext> (ported from admin.php).
+        // Uploads land in public/img/uploads/<category>/<slug>.<ext>.
         if ($request->hasFile('file')) {
             $file = $request->file('file');
             /*
-             * The extension MUST come from the file's sniffed content, never from the client's
-             * filename. `mimes:` validates via guessExtension(), i.e. the real MIME - so a file
-             * holding valid PNG bytes but NAMED "x.php" passes validation, and the old
-             * getClientOriginalExtension() then wrote it as "<slug>.php" into public/, where
-             * mod_php happily executes it. PNG metadata can carry PHP, so that was remote code
-             * execution from the asset form. extension() re-derives it from the content instead.
+             * The extension comes from the file's sniffed content, never from the client's
+             * filename. `mimes:` validates the real MIME, so a file holding valid PNG bytes but
+             * named "x.php" passes and would be written into public/ as executable PHP. PNG
+             * metadata can carry a payload, which makes that remote code execution.
              */
             $ext = strtolower($file->extension() ?: 'png');
             if (! in_array($ext, ['webp', 'png', 'jpg', 'jpeg', 'gif'], true)) {
                 throw ValidationException::withMessages(['file' => 'Unsupported image type.']);
             }
-            // strip dots too: the extension is appended by us, so a slug never needs one, and
-            // allowing them let a slug smuggle a second extension into the filename.
+            // Dots are stripped along with everything else: the extension is appended below, so a
+            // slug never needs one and allowing it would smuggle a second extension in.
             $safe = preg_replace('/[^a-z0-9_-]/i', '-', $slug) ?: ('asset-'.substr(md5($slug), 0, 6));
             $dir = public_path("img/uploads/{$data['category']}");
             if (! is_dir($dir)) {
@@ -352,10 +336,8 @@ class AdminController extends Controller
             $assetUrl = "/img/uploads/{$data['category']}/$safe.$ext";
         }
 
-        // meta may arrive as a JSON string from the form; store decoded, or null when the
-        // field is genuinely blank. Validation above already rejected malformed JSON, so
-        // there is no decode-failure branch here -- a failed decode must never silently
-        // become null (that is how a typo used to erase glare.dr).
+        // meta arrives as a JSON string from the form. Stored decoded, or null when the field is
+        // blank. Validation above already rejected malformed JSON, so there is no failure branch.
         $meta = $data['meta'] ?? null;
         if (is_string($meta)) {
             $meta = trim($meta) === '' ? null : json_decode($meta, true);
@@ -372,10 +354,9 @@ class AdminController extends Controller
             'enabled' => $data['enabled'] ?? true,
         ];
 
-        // card_assets has UNIQUE (category, slug, generation). The CREATE path is safe because
-        // updateOrCreate matches on exactly that triple, but the EDIT path is a blind update:
-        // renaming a row's slug onto an existing one threw a QueryException (SQLSTATE 23000)
-        // and surfaced as a 500 instead of a field error. Check first and fail validation.
+        // card_assets has UNIQUE (category, slug, generation). updateOrCreate matches on exactly
+        // that triple, so the create path is safe, but an edit that renames a slug onto an
+        // existing row would hit the constraint and surface as a 500. Check first instead.
         if (! empty($data['id'])) {
             $clash = CardAsset::where('category', $values['category'])
                 ->where('slug', $values['slug'])
@@ -425,8 +406,8 @@ class AdminController extends Controller
 
         $activities = Activity::query()
             ->select(['id', 'log_name', 'description', 'subject_type', 'subject_id', 'causer_type', 'causer_id', 'created_at'])
-            // Constrained: a bare with('causer') hydrates the whole User - card blob, e-mail and
-            // all - thirty times per page, to print one name.
+            // Column-scoped: a bare with('causer') hydrates the whole User row, card blob and
+            // email included, once per row, to print one name.
             ->with('causer:id,name')
             ->when($log !== '', fn ($q) => $q->where('log_name', $log))
             ->when($search !== '', function ($q) use ($search) {
@@ -441,14 +422,13 @@ class AdminController extends Controller
 
         return Inertia::render('admin/activity', [
             'activities' => $activities,
-            // Short, bounded list (one row per log channel), so it is cheaper than making the
-            // client guess the channel names.
+            // One row per log channel, so the client does not have to guess the channel names.
             'logs' => Activity::query()->distinct()->orderBy('log_name')->pluck('log_name'),
             'filters' => ['q' => $search, 'log' => $log],
         ]);
     }
 
-    /** How many users still hold the admin role - the lockout guards above key off this. */
+    /** How many users hold the admin role. The lockout guards above key off this. */
     private function adminCount(): int
     {
         return User::role('admin')->count();
@@ -462,8 +442,8 @@ class AdminController extends Controller
             'description' => $a->description,
             'subject' => $a->subject_type ? class_basename($a->subject_type).' #'.$a->subject_id : null,
             'causer' => $a->causer?->name,
-            // `properties` is deliberately not shipped: the table never renders it, and it holds
-            // whatever each logger threw in - request payloads included.
+            // `properties` is not shipped: the table never renders it, and it holds whatever each
+            // logger put there, request payloads included.
             'created_at' => $a->created_at?->diffForHumans(),
         ];
     }

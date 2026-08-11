@@ -2,7 +2,6 @@
 
 namespace App\Models;
 
-// use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
@@ -17,20 +16,22 @@ class User extends Authenticatable
     use HasFactory, HasRoles, LogsActivity, Notifiable;
 
     /**
-     * The attributes that are mass assignable.
+     * Paths a slug may never take. The public card lives at /{slug} on the catch-all, so a user
+     * holding one of these would be silently shadowed by the real route. Shared by sign-up, the
+     * generator and the admin editor.
      *
      * @var list<string>
-     */
-    /**
-     * Paths a slug may never take. The public card lives at /{slug} on the catch-all, so a user
-     * holding one of these would be permanently shadowed by the real route - silently, since the
-     * route simply wins. Shared by sign-up and the admin editor: two copies is how they drift.
      */
     public const RESERVED_SLUGS = [
         'admin', 'api', 'auth', 'build', 'cards', 'dashboard', 'login',
         'logout', 'register', 'settings', 'storage', 'up',
     ];
 
+    /**
+     * The attributes that are mass assignable.
+     *
+     * @var list<string>
+     */
     protected $fillable = [
         'name',
         'email',
@@ -38,7 +39,6 @@ class User extends Authenticatable
         'slug',
         'card',
         'is_public',
-        'google_id',
         'github_id',
         'github_login',
         'avatar',

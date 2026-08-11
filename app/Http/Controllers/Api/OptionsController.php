@@ -6,19 +6,16 @@ use App\Http\Controllers\Controller;
 use App\Models\CardAsset;
 
 /**
- * The Laravel port of api/options.php.
- *   GET /api/options.php
- * Every enabled card option grouped by category, so the Card Lab is entirely
- * DB-driven. Defaults come from CardAssetSeeder via `php artisan db:seed`.
+ * Every enabled card option, grouped by category, so the card lab is entirely database-driven.
+ * Defaults come from CardAssetSeeder via `php artisan db:seed`.
  */
 class OptionsController extends Controller
 {
     public function index()
     {
-        // No self-seeding here any more. This endpoint is public and unauthenticated, so an empty
-        // table meant any anonymous GET kicked off a write-heavy seeder - several at once under
-        // concurrency. CardAssetSeeder is already wired into DatabaseSeeder, so `php artisan
-        // db:seed` is the one place a fresh install gets its defaults.
+        // An empty table answers with an empty object rather than seeding itself: this endpoint is
+        // public and unauthenticated, so self-seeding would let any anonymous GET start a
+        // write-heavy seeder, several at once under concurrency.
         $out = [];
         $rows = CardAsset::where('enabled', 1)
             ->orderBy('category')->orderBy('sort_order')->orderBy('label')

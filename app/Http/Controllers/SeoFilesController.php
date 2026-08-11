@@ -11,13 +11,12 @@ use Illuminate\Support\Facades\Response;
 /**
  * The three machine-readable files: sitemap.xml, robots.txt and llms.txt.
  *
- * Served by routes rather than dropped in public/ because two of the three list every public card,
- * and that set changes whenever somebody signs in or flips their card public. A static file would
- * be stale within a day and there is nothing to regenerate it.
+ * Served by routes rather than written into public/, because two of them list every public card
+ * and that set changes whenever somebody signs in or publishes a card.
  */
 class SeoFilesController extends Controller
 {
-    /** Long enough that a crawler never drives the query, short enough that a new card is found. */
+    /** Long enough that a crawler never drives the query, short enough to pick up a new card. */
     private const TTL = 1800;
 
     /** @return array<int, array{loc: string, lastmod: string|null}> */
@@ -32,8 +31,7 @@ class SeoFilesController extends Controller
                 ->get(['slug', 'updated_at'])
                 ->map(fn (User $u) => ['loc' => url('/'.$u->slug), 'lastmod' => $u->updated_at?->toAtomString()]);
 
-            // The showcase logins are public pages too, and they are the ones with something to
-            // show on an empty site - leaving them out would make the sitemap read as almost bare.
+            // Showcase logins are public pages too, and on a fresh install they are the only ones.
             $showcase = ShowcaseCard::where('is_active', true)
                 ->orderBy('sort_order')
                 ->get(['login', 'updated_at'])
@@ -74,10 +72,9 @@ class SeoFilesController extends Controller
          * walking every card in both formats pays for renders nobody reads. They are README
          * embeds, not search results.
          *
-         * .png is NOT disallowed, and that is deliberate: it is the og:image every card page
-         * points at, and Twitter's card crawler (among others) honours robots.txt before fetching
-         * a preview image. Blocking it here would silently turn every shared link back into a
-         * bare title - the exact thing this whole file exists to avoid.
+         * .png stays allowed on purpose: it is the og:image every card page points at, and link
+         * preview crawlers honour robots.txt before fetching one. Blocking it would turn every
+         * shared link back into a bare title.
          */
         $body = implode("\n", [
             'User-agent: *',
@@ -100,8 +97,8 @@ class SeoFilesController extends Controller
     }
 
     /**
-     * llms.txt - the emerging convention for telling a language model what a site is, in prose it
-     * can actually use, instead of leaving it to infer from a React bundle it cannot execute.
+     * llms.txt, the convention for describing a site to a language model in prose, rather than
+     * leaving it to infer from a React bundle it cannot execute.
      */
     public function llms()
     {
@@ -116,7 +113,7 @@ class SeoFilesController extends Controller
             '## What it is',
             '',
             'PokeHub reads a public GitHub profile and renders it as a Pokemon-style trading card.',
-            'Nothing on the card is chosen by the user - every value is derived from the profile:',
+            'Nothing on the card is chosen by the user. Every value is derived from the profile:',
             '',
             '- Element / type comes from the language they write most',
             '- HP comes from follower count',

@@ -9,19 +9,19 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
 /**
- * PokeHub GitHub proxy - the Laravel port of api/github.php.
- *   GET /api/github.php?u=<username>[&fresh=1]
- * Returns the exact JSON shape the React client already expects (raw GitHub
- * fields + `ai` lore + `rarity` + a nested `card` object). Serves cached rows
- * straight from the DB; GitHub/AI only run on first fetch or ?fresh=1.
+ * The card lab's GitHub proxy.
+ *
+ *     GET /api/github?u=<username>[&fresh=1]
+ *
+ * Returns raw GitHub fields plus `ai` lore, `rarity` and a nested `card` object. Cached rows are
+ * served straight from the database; GitHub and the AI only run on a first fetch or `?fresh=1`.
  */
 class GithubController extends Controller
 {
     public function show(Request $request, GithubCardService $svc)
     {
-        // Give the whole request room for a slow AI plus the GitHub calls: the AI
-        // timeout itself (config) + margin. Must exceed pokehub.ai.timeout or PHP
-        // would kill the script before the model replies.
+        // Room for a slow AI plus the GitHub calls. Must exceed pokehub.ai.timeout, or PHP kills
+        // the script before the model replies.
         @set_time_limit((int) config('pokehub.ai.timeout', 60) + 60);
 
         $login = strtolower(trim((string) $request->query('u', '')));
@@ -33,15 +33,14 @@ class GithubController extends Controller
         $now = time();
 
         $row = Profile::find($login);
-        [$github, $card] = $this->splitRow($row);
+        [$github, $card] = $row?->split() ?? [null, null];
 
-        // A cached profile is served straight from the DB; GitHub/AI only run on
-        // an explicit update (?fresh=1). A corrupt/empty row is a cache miss.
+        // An empty or corrupt row counts as a miss.
         if ($fresh || ! is_array($github) || empty($github['login'])) {
-            // Generating for an arbitrary handle is the playground, so admin only. Guarded here
-            // rather than as route middleware so cached reads stay public for shared links.
+            // Generating for an arbitrary handle is the card lab, so admin only. Guarded here
+            // rather than as route middleware, so cached reads stay public for shared links.
             if (! Auth::user()?->hasRole('admin')) {
-                return $this->fail(403, 'The playground is admin-only.');
+                return $this->fail(403, 'The card lab is admin-only.');
             }
 
             [$user, $err, $code] = $svc->ghGet('https://api.github.com/users/'.rawurlencode($login));
@@ -62,7 +61,7 @@ class GithubController extends Controller
                 if ($repoErr !== null && is_array($github) && ! empty($github['login'])) {
                     // keep stale $github/$card on partial failure
                 } else {
-                    // The already-cached flavor (if any) survives a failed regen below.
+                    // Any already-cached lore survives a failed regeneration below.
                     $prevAi = is_array($card) ? ($card['ai'] ?? null) : null;
                     $github = $svc->buildProfile($user, is_array($repos) ? $repos : []);
                     $card = ['ai' => null];
@@ -72,8 +71,8 @@ class GithubController extends Controller
                             $github['readme'] = $svc->fetchReadme($login);
                             $github['orgs'] = $svc->fetchOrgs($login);
                         }
-                        // A slow AI that times out returns null. Keep the previously generated
-                        // flavor instead of wiping a good card, so a refetch never makes it worse.
+                        // A timed-out AI returns null. Keeping the previous lore means a refetch
+                        // can never make a card worse than it was.
                         $card['ai'] = $svc->aiGenerate($github) ?? $prevAi;
                         unset($github['readme'], $github['orgs']); // AI inputs only; keep github_json compact
 
@@ -86,12 +85,11 @@ class GithubController extends Controller
             }
         }
 
-        // Response = raw GitHub fields + generative card data (flat ai/rarity kept
-        // for the current client, plus a distinct `card` object).
+        // Raw GitHub fields plus the generated card data, with flat `ai`/`rarity` kept alongside
+        // the nested `card` object for the current client.
         $data = is_array($github) ? $github : [];
         $lore = is_array($card) ? ($card['ai'] ?? null) : null;
-        // The profile is what earns the tier, so it has to be handed over - `rarityFor` with no
-        // profile can only return the default.
+        // The profile has to be passed in, since rarityFor without one can only return the default.
         $rarity = $svc->rarityFor($login, $data);
         $data['ai'] = $lore;
         $data['rarity'] = $rarity;
@@ -100,24 +98,6 @@ class GithubController extends Controller
         return response()->json($data, 200, [
             'Cache-Control' => 'public, max-age=60',
         ], JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE);
-    }
-
-    /**
-     * Split a stored Profile into [rawGithubData, generativeCardData], handling a
-     * legacy payload-only row (github + ai combined) the same way api/github.php did.
-     */
-    private function splitRow(?Profile $row): array
-    {
-        $github = ($row && is_array($row->github_json)) ? $row->github_json : null;
-        $card = ($row && is_array($row->card_json)) ? $row->card_json : null;
-        if (! is_array($github) && $row && is_array($row->payload) && ! empty($row->payload['login'])) {
-            $legacy = $row->payload;
-            $card = ['ai' => $legacy['ai'] ?? null];
-            unset($legacy['ai'], $legacy['rarity'], $legacy['card']);
-            $github = $legacy;
-        }
-
-        return [is_array($github) ? $github : null, is_array($card) ? $card : null];
     }
 
     private function fail(int $code, string $msg)

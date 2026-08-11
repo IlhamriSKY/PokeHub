@@ -1,4 +1,5 @@
 import { CardZoom } from '@/components/card-zoom';
+import GenerateForm from '@/components/generate-form';
 import GridBackdrop from '@/components/grid-backdrop';
 import LinePokeball from '@/components/line-pokeball';
 import LoginPanel from '@/components/login-panel';
@@ -57,9 +58,8 @@ const RARITY_LADDER = [
 const STEP_COLORS = ['#66c05c', '#ec4b34', '#4fa0dd', '#a862b0'];
 
 /**
- * Poké Ball as pure line art. Everything Pokémon on this page is drawn with strokes rather than
- * fills, glows or gradients - flat hairlines are what makes printed stationery look expensive,
- * and a blurred coloured blob is what makes it look like a 2015 startup template.
+ * Poké Ball as line art. Everything on this page is drawn with strokes rather than fills, glows or
+ * gradients, so it reads as printed rather than rendered.
  */
 function Pokeball({ className, strokeWidth = 3 }: { className?: string; strokeWidth?: number }) {
     return (
@@ -73,8 +73,8 @@ function Pokeball({ className, strokeWidth = 3 }: { className?: string; strokeWi
 }
 
 /**
- * The GitHub mark, same path the login screen draws. On the button because GitHub is the ONLY way
- * in (routes/auth.php) - a bare "Sign in" made people guess what the next screen asks for.
+ * The GitHub mark, the same path the login screen draws. On the button because GitHub is the only
+ * way in, so a bare "Sign in" would leave people guessing what the next screen asks for.
  */
 function GithubMark() {
     return (
@@ -95,22 +95,57 @@ function BallRule() {
     );
 }
 
-/** The four "how it works" steps. */
+/**
+ * The four "how it works" steps.
+ *
+ * Step 1 is the search box rather than the sign-in, because looking a developer up needs no
+ * account and step 4 is the only thing an account buys.
+ */
 const STEPS = [
-    // GitHub is the only provider wired up (routes/auth.php has just the github redirect +
-    // callback, and login.tsx offers one button), so the step must not promise a second one.
-    { n: 1, title: 'Sign in with GitHub', body: 'One click, and no repository access is ever requested.' },
-    { n: 2, title: 'We read your public stats', body: 'Followers, public repos, stars, and your top language.' },
-    { n: 3, title: 'Your card is generated', body: 'Your stats land on a real card frame.' },
-    { n: 4, title: 'Publish it or keep it private', body: 'Give it a public link, or keep it in your dashboard.' },
+    { n: 1, title: 'Type any GitHub username', body: 'Yours, or a developer you admire. No account needed.' },
+    { n: 2, title: 'We read the public profile', body: 'Followers, public repos, stars, and their top language.' },
+    { n: 3, title: 'The card is generated once', body: 'Then cached, so the next person to search that handle gets it instantly.' },
+    // GitHub is the only provider wired up (see routes/auth.php), so this must not imply a second.
+    { n: 4, title: 'Sign in to claim your own', body: 'Claiming lets you regenerate it, restyle it, or make it private.' },
 ];
 
 /**
- * The FAQ. Kept as data next to STEPS rather than inline JSX so the answers are one place to edit,
- * and so the two that are really disclaimers - the Nintendo one and the asset credits - cannot be
- * quietly reworded into something softer than they need to be.
+ * The FAQ, kept as data beside STEPS so the answers are one place to edit. The last two are
+ * disclaimers rather than questions, and their wording is deliberate.
  */
 const FAQ = [
+    {
+        q: 'Do I need an account to make a card?',
+        a: 'No. The search box at the top of this page works signed out: type a GitHub username and the card is built from that account’s public profile. Signing in does one thing - it claims the card for the handle you signed in as, which is what lets you regenerate it, restyle it, or take it down.',
+    },
+    {
+        q: 'If I generate someone else’s card, is it mine?',
+        a: 'No. Generating a card is not owning it - you can look up anyone, but the card still belongs to the handle it was made from. Signing in claims exactly one card: the one for the GitHub account you signed in with. Nobody can take over a handle they cannot log in as, however many cards they have searched.',
+    },
+    {
+        q: 'Can I generate a card for someone else?',
+        a: 'Yes, that is what the box is for. Every card here is made from the public profile page anyone can already read on github.com. A handle is only ever generated once: if someone has searched it before you, you get that same card immediately instead of a new one, and nothing is re-fetched.',
+    },
+    {
+        q: 'Someone made a card for my username. Can I take it down?',
+        a: 'Yes, and only you can. Sign in with that GitHub account and the card becomes yours - the dashboard has a switch that makes it private, and a private card disappears from the site completely: the link, the gallery and the README image all stop answering. Nobody can generate it again while it is private, either.',
+    },
+    {
+        q: 'How many times can I regenerate my card?',
+        a: 'Five times a day, and only for your own card. The very first one on a new account is on the house and does not count, so signing in never costs you a regeneration just to see yourself. The window is a rolling 24 hours from your first press rather than midnight, and the dashboard shows how many you have left and when they come back. The cap exists because every regeneration is a real AI writing job on our own hardware - looking other people up is not, so searching handles from the home page never spends it, and opening a card that already exists costs nothing at all.',
+    },
+    {
+        q: 'Do you read anything private from my GitHub?',
+        a: 'No, and there is nothing to read: a card is built from the public profile page - followers, public repo count, stars, top languages, and your public README - which is the same data any visitor to your GitHub sees. We never take private repositories, private emails, hidden organisations or anything else non-public. Signing in is OAuth for identity only, and the token it hands us carries no repository scope at all.',
+    },
+    {
+        q: 'Why does generating a card take so long?',
+        a: 'The species name, the flavour text and both attacks are written by an AI, and it is a Qwen model running locally on our own hardware rather than a paid API. That is slower - budget up to two minutes for a first card. Once it is generated it is cached, so opening it again is instant.',
+    },
+    {
+        q: 'Can I pick my own type and rarity?',
+        a: 'No, and that is the point - a card you can choose is a wallpaper. Your element comes from the language you write most, HP from followers, attack damage from stars, retreat cost from public repos, and rarity from all of it together. You can restyle the frame afterwards, not the numbers.',
+    },
     {
         q: 'Is this official? Is it connected to Pokémon or Nintendo?',
         a: 'No. PokeHub is an unofficial fan project built for fun, with no affiliation with, endorsement by, or connection to Nintendo, Game Freak, Creatures Inc. or The Pokémon Company. Pokémon and every related name are their trademarks. Nothing here is for sale.',
@@ -119,27 +154,11 @@ const FAQ = [
         q: 'Where do the card assets come from?',
         a: 'From several places, and none of them are ours. The card frames, stamps and badges come from pokecardgenerator.com, and the holo / foil shine is built on poke-holo.simey.me (simeydotme). Credit and thanks to the original authors - if you own something here and would rather it were not, get in touch and it comes down.',
     },
-    {
-        q: 'Why does generating a card take so long?',
-        a: 'The species name, the flavour text and both attacks are written by an AI, and it is a Qwen model running locally on our own hardware rather than a paid API. That is slower - budget up to two minutes for a first card. Once it is generated it is cached, so opening it again is instant.',
-    },
-    {
-        q: 'Do you get access to my repositories?',
-        a: 'No. Signing in is GitHub OAuth for identity only, and the card is built from the same public profile data anyone can see on your GitHub page: followers, public repo count, stars, and your top languages. Private repositories are never requested and never read.',
-    },
-    {
-        q: 'Can I pick my own type and rarity?',
-        a: 'No, and that is the point - a card you can choose is a wallpaper. Your element comes from the language you write most, HP from followers, attack damage from stars, retreat cost from public repos, and rarity from all of it together. You can restyle the frame afterwards, not the numbers.',
-    },
-    {
-        q: 'Is my card public?',
-        a: 'Only if you say so. A new card stays in your dashboard until you publish it, and publishing gives it a link at pokehub.dev/your-username plus an .svg of the same card you can embed in a README. You can make it private again at any time.',
-    },
 ];
 
 function ThemeSwitch() {
     const { appearance, updateAppearance } = useAppearance();
-    // Light and dark only - no "system".
+    // Light and dark only, with no "system" option.
     const themes: { key: Appearance; icon: typeof Sun; label: string }[] = [
         { key: 'light', icon: Sun, label: 'Light' },
         { key: 'dark', icon: Moon, label: 'Dark' },
@@ -172,9 +191,97 @@ function ShowcaseCard({ entry, rarities, options }: { entry: ShowcaseEntry; rari
     return <PokeCard profile={entry.profile} rarity={rarity} {...resolveOverrides(options, entry.axes, rarity)} />;
 }
 
+/**
+ * The showcase cards fanned in from both edges of the hero, two per side, framing the search box.
+ *
+ * The outer card of each pair tilts hardest and rides high while the inner one straightens and
+ * drops, which is what reads as a fan rather than four cards leaning at random. Widths are a share
+ * of the column so the pair keeps its proportions in a wide gutter.
+ *
+ * `lift` is a margin rather than a translate, because `hover:-translate-y-2` owns the `translate`
+ * property and an inline value would beat the class and kill the hover.
+ *
+ * The widths look conservative for the space, and that slack is holding the rotation overhang: a
+ * turned card's bounding box is wider than its layout width, which layout does not account for and
+ * the section's overflow-hidden would otherwise shear off.
+ */
+const FAN = [
+    { rotate: '-15deg', width: '46%', lift: '-1.75rem', z: 1, overlap: '0' },
+    { rotate: '-6deg', width: '52%', lift: '1.25rem', z: 2, overlap: '-12%' },
+    { rotate: '6deg', width: '52%', lift: '1.25rem', z: 2, overlap: '0' },
+    { rotate: '15deg', width: '46%', lift: '-1.75rem', z: 1, overlap: '-12%' },
+];
+
+/**
+ * The same cards below xl, closed into a single hand, since a narrow screen has no gutters to
+ * open into.
+ *
+ * The middle pair rides high and the outer pair drops, which is the arc a hand makes when fanned
+ * about a pivot below the cards. z rises left to right so each card overlaps the one before it;
+ * a symmetric stack reads as a shuffled pile.
+ *
+ * The widths leave the same rotation overhang as FAN above.
+ */
+const HAND = [
+    { rotate: '-14deg', width: '32%', lift: '1.5rem', z: 1, overlap: '0' },
+    { rotate: '-5deg', width: '32%', lift: '0rem', z: 2, overlap: '-14%' },
+    { rotate: '5deg', width: '32%', lift: '0rem', z: 3, overlap: '-14%' },
+    { rotate: '14deg', width: '32%', lift: '1.5rem', z: 4, overlap: '-14%' },
+];
+
+function FanCard({
+    entry,
+    index,
+    rarities,
+    options,
+    onZoom,
+    fan,
+    className,
+}: {
+    entry: ShowcaseEntry;
+    index: number;
+    rarities: Rarity[];
+    options: CardOptions;
+    onZoom: (e: ShowcaseEntry) => void;
+    fan?: (typeof FAN)[number];
+    className?: string;
+}) {
+    return (
+        <button
+            type="button"
+            onClick={() => onZoom(entry)}
+            aria-label={`View ${entry.name}'s card`}
+            title={`${entry.name} - ${entry.why}`}
+            className={`focus-visible:ring-ring cursor-zoom-in rounded-xl transition-[translate,filter] duration-300 hover:-translate-y-2 focus-visible:ring-2 focus-visible:outline-none ${className ?? ''}`}
+            style={{
+                // Staggered entrance so the gate assembles rather than appearing. The keyframe is
+                // `pokehub-pop` (card.css) - a bare `pop` silently animates nothing. It animates
+                // `transform`, which composes with the `rotate`/`translate` properties below rather
+                // than fighting them.
+                animation: `pokehub-pop .45s ease ${index * 90}ms both`,
+                ...(fan && { rotate: fan.rotate, width: fan.width, marginTop: fan.lift, marginLeft: fan.overlap, zIndex: fan.z }),
+            }}
+        >
+            <ShowcaseCard entry={entry} rarities={rarities} options={options} />
+        </button>
+    );
+}
+
 function ZoomOverlay({ entry, rarities, options, onClose }: { entry: ShowcaseEntry; rarities: Rarity[]; options: CardOptions; onClose: () => void }) {
     return (
-        <CardZoom caption={entry.name} sub={entry.why} onClose={onClose}>
+        <CardZoom
+            caption={entry.name}
+            sub={entry.why}
+            onClose={onClose}
+            /* Links to the card's own page rather than the GitHub profile. The fanned tiles carry
+               no caption, so without this the showcase pages have nothing linking to them from
+               the home page. */
+            actions={
+                <Button asChild size="sm" variant="secondary">
+                    <Link href={`/${entry.login}`}>{`Open @${entry.login}`}</Link>
+                </Button>
+            }
+        >
             <ShowcaseCard entry={entry} rarities={rarities} options={options} />
         </CardZoom>
     );
@@ -190,14 +297,16 @@ export default function Landing({ showcase, showLogin, status }: { showcase: Sho
     const signedIn = !!auth?.user;
     const ctaHref = signedIn ? '/dashboard' : '/login';
     // Signed out, /login is this same page with the panel open, so the visit must not reset scroll
-    // or tear down this component - otherwise "opening" the panel silently throws the visitor back
-    // to the top of the page they were reading. Signed in, ctaHref is /dashboard, a real navigation
-    // that should behave normally.
+    // or tear this component down: opening the panel would otherwise throw the visitor back to the
+    // top of the page. Signed in, /dashboard is a real navigation and should behave normally.
     const ctaProps = signedIn ? {} : { preserveScroll: true, preserveState: true };
 
     return (
         <div className="bg-background text-foreground min-h-screen">
-            <Head title="PokeHub: your GitHub profile as a Pokémon card" />
+            {/* Matches the server-rendered <title> in LandingController's Seo block. Inertia
+                rewrites it after hydration, so a stale string here would make the tab disagree
+                with the share card and with what Google indexed. */}
+            <Head title="PokeHub - any GitHub profile as a Pokémon card" />
 
             <header className="border-border/60 bg-background/80 sticky top-0 z-30 border-b backdrop-blur-md">
                 <div className="mx-auto flex max-w-6xl items-center gap-2 px-4 py-3">
@@ -221,83 +330,79 @@ export default function Landing({ showcase, showLogin, status }: { showcase: Sho
 
             {/* ---------- hero ---------- */}
             <section className="relative isolate overflow-hidden">
-                {/* The three coloured radial glows that used to sit here are gone. A flat hairline
-                    grid plus one oversized Poké Ball outline carries the whole backdrop - no blur,
-                    no gradient wash, nothing competing with the cards for attention. */}
+                {/* A hairline grid and one oversized Poké Ball outline carry the whole backdrop:
+                    no blur, no gradient wash, nothing competing with the cards. */}
                 <GridBackdrop />
 
-                {/* One rhythm for the whole page: every section below is py-14, so the hero closes
-                    on the same 14 and only its TOP is bigger. The showcase heading used to sit 48px
-                    under the CTA buttons and read as part of the hero. */}
-                <div className="mx-auto max-w-6xl px-4 pt-12 pb-14 text-center sm:pt-16">
-                    <Badge variant="secondary" className="mb-4 gap-1.5 px-3 py-1">
-                        <Sparkles className="h-3 w-3" />
-                        {'Straight from live GitHub data'}
-                    </Badge>
-                    {/* hyphens-none + break-normal: the browser was splitting "GitHub-mu" across
-                        lines, which read as a typo on the most prominent line of the page. */}
-                    <h1 className="mx-auto max-w-4xl text-4xl leading-[1.08] font-black tracking-tight text-balance hyphens-none sm:text-5xl lg:text-6xl">
-                        {'Turn your GitHub profile into a Pokémon card'}
-                    </h1>
-                    <p className="text-muted-foreground mx-auto mt-4 max-w-xl leading-relaxed text-pretty">
-                        {
-                            'Sign in, and your public GitHub stats are read once and printed onto a real card frame. No repository access, nothing to fill in.'
-                        }
-                    </p>
+                {/* One rhythm for the page: every section below is py-14, so the hero closes on the
+                    same value and only its top is larger. Wider than the rest of the page, because
+                    the fanned cards need the extra gutter to open into. */}
+                <div className="mx-auto max-w-7xl px-4 pt-12 pb-14 sm:pt-16">
+                    {/* A real 3-column grid, not absolutely positioned decoration: the gate can then
+                        never land on the headline at any width, which is exactly what percentage
+                        offsets could not promise. The centre column is a fixed measure, so the two
+                        gutters are whatever is left and the cards scale into them. */}
+                    <div className="grid items-center gap-8 xl:grid-cols-[1fr_minmax(0,40rem)_1fr]">
+                        <div className="hidden items-center justify-end xl:flex">
+                            {showcase.slice(0, 2).map((s, i) => (
+                                <FanCard key={s.login} entry={s} index={i} fan={FAN[i]} rarities={rarities} options={options} onZoom={setZoom} />
+                            ))}
+                        </div>
 
-                    <div className="mt-7 flex flex-wrap items-center justify-center gap-3">
-                        <Button asChild size="lg" className="h-12 gap-2.5 px-7 text-base">
-                            <Link href={ctaHref} {...ctaProps}>
-                                {!signedIn && <GithubMark />}
-                                {signedIn ? 'Go to dashboard' : 'Sign in with GitHub'}
-                            </Link>
-                        </Button>
-                        <Button asChild size="lg" variant="outline" className="h-12 gap-2 px-6 text-base">
-                            <a href="#how">
-                                {'See how it works'}
-                                <ArrowRight className="h-4 w-4" />
-                            </a>
-                        </Button>
+                        <div className="text-center">
+                            <Badge variant="secondary" className="mb-4 gap-1.5 px-3 py-1">
+                                <Sparkles className="h-3 w-3" />
+                                {'Straight from live GitHub data'}
+                            </Badge>
+                            {/* hyphens-none + break-normal: the browser was splitting "GitHub-mu" across
+                                lines, which read as a typo on the most prominent line of the page. */}
+                            <h1 className="text-4xl leading-[1.08] font-black tracking-tight text-balance hyphens-none sm:text-5xl lg:text-6xl">
+                                {'Turn any GitHub profile into a Pokémon card'}
+                            </h1>
+                            <p className="text-muted-foreground mx-auto mt-4 max-w-xl leading-relaxed text-pretty">
+                                {
+                                    'Type a username - yours or anyone’s. Their public GitHub stats are read once and printed onto a real card frame. No sign-in, nothing to fill in.'
+                                }
+                            </p>
+
+                            {/* The page's primary action, and it is not the sign-in any more: the search box
+                                is the product, and asking for an account before anyone has seen a card was
+                                the whole problem with the old hero. Signing in is offered where it means
+                                something - on a card, to claim it. */}
+                            <GenerateForm />
+
+                            <div className="mt-5">
+                                <a href="#how" className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5 text-sm">
+                                    {'See how it works'}
+                                    <ArrowRight className="h-3.5 w-3.5" />
+                                </a>
+                            </div>
+                        </div>
+
+                        <div className="hidden items-center justify-start xl:flex">
+                            {showcase.slice(2, 4).map((s, i) => (
+                                <FanCard
+                                    key={s.login}
+                                    entry={s}
+                                    index={i + 2}
+                                    fan={FAN[i + 2]}
+                                    rarities={rarities}
+                                    options={options}
+                                    onZoom={setZoom}
+                                />
+                            ))}
+                        </div>
                     </div>
-                </div>
-            </section>
 
-            {/* ---------- showcase ---------- */}
-            <section className="mx-auto max-w-6xl px-4 py-14">
-                <div className="mb-7 text-center">
-                    <h2 className="text-2xl font-bold tracking-tight text-balance sm:text-3xl">{'Four developers you already know'}</h2>
-                    <p className="text-muted-foreground mt-2 text-sm text-pretty">
-                        {'Real profiles, real numbers, made the same way yours will be.'}
-                    </p>
-                </div>
-
-                <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-                    {showcase.map((s, i) => (
-                        <figure key={s.login} className="flex flex-col items-center gap-2.5">
-                            <button
-                                type="button"
-                                onClick={() => setZoom(s)}
-                                aria-label={`${'View card'}: ${s.name}`}
-                                className="focus-visible:ring-ring w-full max-w-[248px] cursor-zoom-in rounded-xl transition-transform duration-300 hover:-translate-y-2 focus-visible:ring-2 focus-visible:outline-none"
-                                /* Staggered entrance so the four cards land in sequence. The
-                                   keyframe is `pokehub-pop` (card.css) - a bare `pop` silently
-                                   animates nothing. */
-                                style={{ animation: `pokehub-pop .45s ease ${i * 90}ms both` }}
-                            >
-                                <ShowcaseCard entry={s} rarities={rarities} options={options} />
-                            </button>
-                            <figcaption className="text-center">
-                                <p className="font-semibold">{s.name}</p>
-                                <p className="text-muted-foreground mt-0.5 text-xs text-pretty">{s.why}</p>
-                                {/* The card's own PokeHub page, not their GitHub profile - the
-                                    point of the link is the card, and the gallery already uses
-                                    this same /{slug} shape. */}
-                                <Link href={`/${s.login}`} className="text-primary mt-1.5 inline-block text-xs hover:underline">
-                                    @{s.login}
-                                </Link>
-                            </figcaption>
-                        </figure>
-                    ))}
+                    {/* Below xl the gutters are too narrow to open a gate into, so the four cards
+                        close into a held hand under the search box instead - same fan, one arc
+                        rather than two. Hiding them entirely would mean a phone never sees a card
+                        before scrolling past the whole pitch. */}
+                    <div className="mx-auto mt-12 flex w-full max-w-lg items-start justify-center xl:hidden">
+                        {showcase.slice(0, 4).map((s, i) => (
+                            <FanCard key={s.login} entry={s} index={i} fan={HAND[i]} rarities={rarities} options={options} onZoom={setZoom} />
+                        ))}
+                    </div>
                 </div>
             </section>
 
@@ -470,15 +575,15 @@ export default function Landing({ showcase, showLogin, status }: { showcase: Sho
                         size="h-40 w-40"
                         tilt="12deg"
                     />
-                    {/* The heading, the body and the button used to open with "Sign in" three times
-                        in a row. Only the button says it now - it is the thing being clicked. */}
+                    {/* Only the button says "Sign in": it is the thing being clicked, and repeating
+                        it in the heading and the body reads as nagging. */}
                     <h2 className="text-2xl font-bold tracking-tight text-balance sm:text-3xl">
-                        {signedIn ? 'Your card is waiting' : 'Your card is one click away'}
+                        {signedIn ? 'Your card is waiting' : 'Claim the card with your name on it'}
                     </h2>
                     <p className="text-muted-foreground mx-auto mt-2.5 max-w-md text-sm leading-relaxed text-pretty">
                         {signedIn
                             ? 'Open your dashboard to restyle it, publish it, or copy the README embed.'
-                            : 'Signing in creates your account and generates the card from your public profile. Nothing to fill in.'}
+                            : 'Anyone can generate your card up there, and someone may already have. Signing in makes it yours - regenerate it, restyle it, or make it private.'}
                     </p>
                     <div className="mt-7">
                         <Button asChild size="lg" className="h-12 gap-2.5 px-7 text-base">

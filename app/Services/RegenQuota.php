@@ -8,23 +8,20 @@ use Illuminate\Support\Facades\RateLimiter;
 /**
  * The daily card-generation quota: how much is spent, when it resets, and who is exempt.
  *
- * It lives here rather than inside the `card-regen` limiter because the dashboard has to PRINT the
- * same numbers the enforcement uses, and a middleware limit cannot be read back out reliably:
- * ThrottleRequests derives its cache key as `md5($limiterName.$limit->key)` - or not, depending on
- * a static hashing flag - so a second copy of that derivation is a silent drift waiting to happen.
- * One key, owned here, is used by both sides. The per-minute burst limit stays in AppServiceProvider;
- * nothing displays that one.
+ * It lives here rather than inside the `card-regen` limiter because the dashboard has to print the
+ * same numbers the enforcement uses, and ThrottleRequests' cache key cannot be re-derived without
+ * a second copy that would drift. One key, owned here, serves both sides. The per-minute burst
+ * limit stays in AppServiceProvider, since nothing displays it.
  */
 class RegenQuota
 {
-    /** Rolling 24h from the first press, not midnight - the same window the limiter used. */
+    /** Rolling 24h from the first press, not from midnight. */
     private const WINDOW = 86400;
 
     /**
-     * The welcome generation is once per GitHub identity, not once per day, so its marker has to
-     * outlive every 24h window. A year is "forever" for this purpose and keeps it in the same cache
-     * store the daily counter already uses, rather than adding a column that account deletion
-     * would wipe - see the note on key() for why that distinction is the whole point.
+     * The welcome generation is once per GitHub identity rather than once per day, so its marker
+     * has to outlive every daily window. A year is long enough, and keeping it in the cache store
+     * the counter already uses avoids a column that account deletion would wipe. See key().
      */
     private const WELCOME_WINDOW = 31536000;
 
@@ -36,8 +33,8 @@ class RegenQuota
     }
 
     /**
-     * Admins are not blocked - but the counter still runs for them, so the dashboard shows their
-     * real usage against the same cap rather than a permanent 0.
+     * Admins are not blocked, but the counter still runs for them so the dashboard shows real
+     * usage against the same cap rather than a permanent zero.
      */
     public function unlimited(): bool
     {
@@ -58,10 +55,9 @@ class RegenQuota
     /**
      * True while the free first generation is still unspent.
      *
-     * Deliberately NOT `$user->card === null`: account deletion is a hard delete, so a null card is
-     * exactly the state a delete + re-authorise round trip produces. Reading the card would hand
-     * out a fresh free generation on every cycle - the same bypass key() exists to close, reopened
-     * one card at a time. This marker is keyed on the GitHub identity instead, which survives it.
+     * Not `$user->card === null`, because a hard account delete produces exactly that state and
+     * would hand out a fresh free generation on every delete-and-reauthorise cycle. The marker is
+     * keyed on the GitHub identity instead, which survives the round trip.
      */
     public function hasWelcome(): bool
     {
@@ -70,7 +66,7 @@ class RegenQuota
 
     public function exceeded(): bool
     {
-        // An unspent welcome is never blocked, even at 5/5: it is not drawn from the daily pot.
+        // An unspent welcome is never blocked, since it does not come out of the daily pot.
         if ($this->unlimited() || $this->hasWelcome()) {
             return false;
         }
@@ -79,8 +75,8 @@ class RegenQuota
     }
 
     /**
-     * Spend one generation. The first one on a GitHub identity is on the house and leaves the daily
-     * counter untouched, so a new account does not burn a fifth of its quota just to see its card.
+     * Spend one generation. The first on a GitHub identity is free and leaves the daily counter
+     * untouched, so a new account does not spend part of its quota just to see its card.
      */
     public function spend(): void
     {
@@ -106,11 +102,10 @@ class RegenQuota
     }
 
     /**
-     * Keyed on github_id, NOT users.id. Account deletion is a hard delete, so burning the quota and
-     * then deleting + re-authorising minted a fresh users.id and a fresh five generations - the one
-     * bypass that costs actual money. GitHub hands back the same numeric id on every sign-in, so it
-     * survives that round trip. Falls back to the row id for the seeded admin, which has no GitHub
-     * identity of its own.
+     * Keyed on github_id rather than users.id. Account deletion is a hard delete, so keying on the
+     * row id would let a spent quota be reset by deleting and re-authorising. GitHub returns the
+     * same numeric id on every sign-in. Falls back to the row id for the seeded admin, which has
+     * no GitHub identity.
      */
     private function key(): string
     {

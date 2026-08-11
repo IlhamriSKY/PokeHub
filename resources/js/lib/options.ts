@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 
-/** One selectable card option row from the DB (api/options.php). */
+/** One selectable card option row from the DB (api/options). */
 export type CardOption = {
     id: number;
     slug: string;
@@ -19,7 +19,7 @@ const EMPTY: CardOptions = {};
 let cached: Promise<CardOptions> | null = null;
 
 const loadOptions = (): Promise<CardOptions> =>
-    (cached ??= fetch('/api/options.php')
+    (cached ??= fetch('/api/options')
         // Throw, don't resolve with EMPTY: a 500 resolved SUCCESSFULLY, so the catch below never
         // ran and the empty set stayed memoised for the life of the SPA - one blip during a deploy
         // and every card on every page rendered frameless until a full browser reload.

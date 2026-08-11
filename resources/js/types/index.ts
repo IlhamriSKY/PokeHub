@@ -34,6 +34,8 @@ export interface User {
     name: string;
     email: string;
     avatar?: string;
+    /** The handle every card is generated from, so the public card page can tell whose it is. */
+    github_login?: string | null;
     email_verified_at: string | null;
     created_at: string;
     updated_at: string;

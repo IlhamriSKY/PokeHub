@@ -20,9 +20,8 @@ class PublicCardController extends Controller
     /**
      * The share preview for one card.
      *
-     * og:image is the card's OWN render, as `.png`: scrapers reject `.svg` outright and several
-     * show only a GIF's first frame, so neither of the two formats the README embed uses is safe
-     * here. The image is generated on first request like the others and cached from then on.
+     * og:image is the card's own render as `.png`, since scrapers reject `.svg` and several show
+     * only a GIF's first frame. It is generated on first request and cached from then on.
      *
      * @param  array{owner: array<string, mixed>, card: array<string, mixed>}  $found
      * @return array<string, mixed>
@@ -31,18 +30,17 @@ class PublicCardController extends Controller
     {
         $owner = $found['owner'];
         $p = $found['card']['profile'] ?? [];
-        // The GitHub login keeps its real casing for DISPLAY ("@IlhamriSKY"), but every URL below
-        // uses the stored slug. They differ in case, and MySQL's collation makes /IlhamriSKY answer
-        // the same page as /ilhamrisky - so pointing canonical or og:image at the login would
-        // publish a second address for one card and split it in the index.
+        // The login keeps its real casing for display, but every URL below uses the stored slug.
+        // MySQL's collation answers both casings with the same page, so pointing canonical or
+        // og:image at the login would publish a second address for one card.
         $login = (string) ($p['login'] ?? $slug);
         $canonicalSlug = (string) ($owner['slug'] ?: strtolower($login));
         $name = (string) ($owner['name'] ?: $login);
         $lang = (string) ($p['top_lang'] ?? '');
         $ai = $p['ai'] ?? null;
 
-        // The AI flavour line is already a one-sentence description of this person, written for
-        // exactly this length - better than anything assembled from the stat columns.
+        // The AI flavour line is already a one-sentence description written for this length, so it
+        // beats anything assembled from the stat columns.
         $desc = is_array($ai) && ! empty($ai['flavor'])
             ? (string) $ai['flavor']
             : trim(sprintf(
@@ -64,8 +62,8 @@ class PublicCardController extends Controller
             'imageHeight' => Seo::CARD_H,
             'imageAlt' => sprintf('%s as a Pokemon-style trading card', $name),
             'type' => 'profile',
-            // Portrait art: `summary_large_image` crops a tall card badly on Twitter, where the
-            // small square of `summary` shows the whole thing.
+            // The art is portrait, and `summary_large_image` crops a tall card badly. The small
+            // square of `summary` shows the whole thing.
             'twitterCard' => 'summary',
             'jsonLd' => [
                 '@context' => 'https://schema.org',

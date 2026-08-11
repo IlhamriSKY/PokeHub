@@ -16,21 +16,20 @@ class AuthenticatedSessionController extends Controller
     /**
      * Show the login page.
      *
-     * Renders the LANDING component, not `auth/login`: signing in is a panel over the landing page
-     * rather than a separate screen, so /login has to serve the page it floats above. That keeps a
-     * direct hit on /login (a bookmark, the `auth` middleware bouncing a guest off /dashboard, or
-     * GitHub handing back a failure) looking identical to clicking Sign in from the landing itself.
+     * Renders the landing component rather than `auth/login`, because signing in is a panel over
+     * the landing page rather than a separate screen. A direct hit on /login then looks identical
+     * to clicking Sign in from the landing itself.
      *
-     * `auth/login` still exists and is still used - /admin renders it standalone, where dropping a
-     * guest onto a marketing page instead of a login box would be the wrong answer.
+     * `auth/login` is still used on its own by /admin, where a guest should meet a login box
+     * rather than a marketing page.
      */
     public function create(Request $request): Response
     {
         return Inertia::render('landing', app(LandingController::class)->props([
             'showLogin' => true,
             'status' => $request->session()->get('status'),
-            // Same markup as the landing page at a second address. Indexing it would compete with
-            // "/" for the identical content, and a login screen is nobody's search result.
+            // Same markup as "/" at a second address, so indexing it would compete with the home
+            // page for identical content.
             'seo' => Seo::private('Log in to PokeHub'),
         ]));
     }

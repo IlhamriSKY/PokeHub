@@ -198,26 +198,27 @@ const EFFECT_FAMILY: Record<string, string[]> = {
 };
 
 /**
- * A whole card, rolled locally - no AI involved, the model only ever writes the text.
+ * A whole card, rolled locally. No AI is involved; the model only ever writes the text.
  *
- * Every axis is drawn from the SAME tiles the lab offers for the card in hand (buildSections), so
+ * Every axis is drawn from the same tiles the lab offers for the card in hand (buildSections), so
  * a rolled card can never be a combination the lab cannot produce: chrome only on the generations
  * that have it, frames only from that generation's set, no type or stage on a Trainer template.
- * Reusing those tiles is the point - a second copy of the gating rules here would drift from the
- * first one the day an asset is added.
+ * Reusing those tiles matters, since a second copy of the gating rules here would drift the day an
+ * asset is added.
  *
- * Legality is not the whole of it though. These stay grounded rather than uniform, because a
- * random value would contradict what the card claims:
- *   - element    from the languages this dev actually writes (rollElement)
- *   - dualType   their SECOND language, and only sometimes - most real cards have one type
+ * Legality is not the whole of it. These stay grounded rather than uniform, because a random value
+ * would contradict what the card claims:
+ *   - element    from the languages this developer actually writes (rollElement)
+ *   - dualType   their second language, and only sometimes, since most real cards have one type
  *   - subtype    the stage is earned from account age; a one-year-old account is not a Stage 2
- *   - icon       the ex/V/VMAX emblem needs a card with that mechanic, i.e. the rarity preset
+ *   - icon       the ex/V/VMAX emblem needs a card with that mechanic, so it follows the preset
  *   - effect     matched to the element (EFFECT_FAMILY)
- *   - badge      always, on the generations that print one: a real modern card always carries
- *                its set symbol
- *   - glare + rarityMark stay 'auto', which follows the rarity tier. A rainbow foil or a
- *     two-star mark on a Common says the exact opposite of what the rarity says.
- * `firstEdition` is not rolled at all - the server derives it from account age.
+ *   - badge      always, on the generations that print one, the way a real card carries its set
+ *                symbol
+ *   - glare and rarityMark stay 'auto', which follows the rarity tier. A rainbow foil or a
+ *     two-star mark on a Common contradicts the rarity itself.
+ *
+ * `firstEdition` is not rolled here at all; the server derives it from account age.
  */
 export function rollAxes(options: CardOptions, base: Partial<Axes>, rarity: Rarity, rarities: Rarity[], profile?: Profile): Partial<Axes> {
     const gens = options.generation ?? [];
@@ -320,9 +321,9 @@ export function CardGallery({
 }) {
     const [query, setQuery] = useState('');
     const [axis, setAxis] = useState('all');
-    // Clicking a tile no longer applies it. It opens this, and Apply lives in there - the grid is
-    // 188 cards of roughly thumbnail size, where "which one did I just click" is a fair question
-    // and an accidental apply silently rewrote the card being edited.
+    // Clicking a tile opens this rather than applying it, and Apply lives inside. The grid is
+    // nearly two hundred thumbnails, where a misclick would silently rewrite the card being
+    // edited.
     const [zoom, setZoom] = useState<Tile | null>(null);
 
     useEffect(() => {

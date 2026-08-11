@@ -3,6 +3,7 @@ import { CardZoom } from '@/components/card-zoom';
 import { PokeCard } from '@/components/PokeCard';
 import { Turnstile } from '@/components/turnstile';
 import { Button } from '@/components/ui/button';
+import WaitLine from '@/components/wait-line';
 import AppLayout from '@/layouts/app-layout';
 import { resolveOverrides, type Axes } from '@/lib/cardModel';
 import { useCardOptions } from '@/lib/options';
@@ -37,8 +38,8 @@ export default function Dashboard() {
 
     const [busy, setBusy] = useState(false);
     const [captcha, setCaptcha] = useState('');
-    // Which button was last pressed, not a bare boolean: the link and the README snippet share
-    // the copied tick, and a boolean would flash both.
+    // Which button was last pressed rather than a bare boolean: the link and the README snippet
+    // share the copied tick, and a boolean would flash both at once.
     const [copied, setCopied] = useState('');
     const [zoomed, setZoomed] = useState(false);
     const closeZoom = useCallback(() => setZoomed(false), []);
@@ -49,7 +50,7 @@ export default function Dashboard() {
         setBusy(true);
         router.post(
             '/dashboard/card/regenerate',
-            // A whole fresh card each press - type, stage, frame, chrome, foil - rolled locally
+            // A whole fresh card each press (type, stage, frame, chrome, foil), rolled locally
             // from the same tiles the lab offers. See rollAxes; the AI only writes the text.
             { 'cf-turnstile-response': captcha, axes: rollAxes(options, card?.axes ?? {}, activeRarity, rarities, card?.profile) },
             {
@@ -98,8 +99,8 @@ export default function Dashboard() {
             <Head title="My card" />
 
             <div className="flex w-full flex-col p-4">
-                {/* The card's energy colour lives on the panel border. A rarity badge next to the
-                    handle said nothing the card was not already saying with its own symbol and foil. */}
+                {/* The card's energy colour lives on the panel border. The rarity is not repeated
+                    beside the handle: the card already shows it with its symbol and foil. */}
                 <div
                     className="bg-card overflow-hidden rounded-2xl border shadow-sm"
                     style={{ borderColor: `color-mix(in oklab, ${accent} 45%, transparent)` }}
@@ -155,10 +156,9 @@ export default function Dashboard() {
                                     </Button>
                                 </div>
 
-                                {/* Shown while private too: the snippet is yours to keep either way, and a
-                                    disabled button just makes people toggle public to find out what it says.
-                                    Both URLs 404 until the card is public, so the sub-line says so rather
-                                    than letting a dead embed land in someone's README unannounced. */}
+                                {/* Shown while private too, so nobody has to publish just to read the
+                                    snippet. The URLs 404 until the card is public, which the sub-line
+                                    says rather than letting a dead embed land in a README. */}
                                 {publicUrl && (
                                     <>
                                         <div className="mt-2.5 flex items-center gap-1.5 border-t pt-2.5">
@@ -179,9 +179,9 @@ export default function Dashboard() {
                                             link, not the card. Wrapped in an anchor so the image is clickable there. */}
                                         <div className="mt-2.5 flex items-center gap-1.5 border-t pt-2.5">
                                             <div className="min-w-0 flex-1">
-                                                {/* Named after the repo it belongs in, not the file: GitHub shows a
-                                                    profile README from `github.com/<you>/<you>`, so the handle is what
-                                                    tells you where the snippet goes. */}
+                                                {/* Named after the repo it belongs in rather than the file. GitHub
+                                                    serves a profile README from `github.com/<you>/<you>`, so the
+                                                    handle is what tells you where the snippet goes. */}
                                                 <p className="truncate text-xs font-medium">{profile.github_login ?? 'your profile'}.md</p>
                                                 <p className="text-muted-foreground truncate text-[11px]">
                                                     {profile.is_public ? 'Markdown for your GitHub profile' : 'Renders once your card is public'}
@@ -251,9 +251,9 @@ function turnstileRequired(props: SharedData): boolean {
 const hhmmss = (s: number) => [Math.floor(s / 3600), Math.floor((s % 3600) / 60), s % 60].map((n) => String(n).padStart(2, '0')).join(':');
 
 /**
- * Ticks the server's `resets_in` down locally, and pulls a fresh count when it lands on zero -
- * without that the window has cleared server-side while the page still shows 5/5 and a disabled
- * button, which reads as the reset having failed.
+ * Ticks the server's `resets_in` down locally and pulls a fresh count when it reaches zero.
+ * Without that the window clears server-side while the page still shows a spent quota and a
+ * disabled button, which reads as the reset having failed.
  */
 function useCountdown(seconds: number): number {
     const [left, setLeft] = useState(seconds);
@@ -275,9 +275,9 @@ function useCountdown(seconds: number): number {
 }
 
 /**
- * Every press is a paid AI completion, so the cap is worth showing rather than discovering at the
- * fifth press. An admin sees the same meter and the same countdown - they are counted like anyone
- * else, they are just not blocked, which is what the badge says.
+ * Every press is a paid AI completion, so the cap is shown rather than discovered on the last
+ * press. An admin sees the same meter and countdown: they are counted like anyone else and simply
+ * not blocked, which is what the badge says.
  */
 function QuotaMeter({ quota }: { quota: Quota }) {
     const left = useCountdown(quota.resets_in);
@@ -305,8 +305,8 @@ function QuotaMeter({ quota }: { quota: Quota }) {
 
             <p className="text-muted-foreground mt-2 text-[11px]">
                 {quota.unlimited && 'Not blocked at the cap. '}
-                {/* Worth saying out loud: otherwise the first generation looks like a bug when the
-                    meter stays on 0 / 5 afterwards. */}
+                {/* Said out loud, or the meter staying at zero after the first generation reads as
+                    a bug. */}
                 {quota.welcome && 'Your first card is free and does not count. '}
                 {left > 0 ? (
                     <>
@@ -317,59 +317,6 @@ function QuotaMeter({ quota }: { quota: Quota }) {
                 )}
             </p>
         </div>
-    );
-}
-
-// The self-hosted model can take two minutes; a bare spinner that long reads as broken.
-const WAIT_LINES = [
-    'Waking the AI…',
-    'Evolving… do not press B.',
-    'It used Splash. Nothing.',
-    'Asking Professor Oak.',
-    'Stuck behind a Slowpoke.',
-    'Reading your Pokedex.',
-    'Charging a two-turn move.',
-    'Nurse Joy says: one sec.',
-    'Rare Candy used. Level 5.',
-    'Grinding Route 1.',
-    'Team Rocket took a GPU.',
-    'The AI fainted. Reviving.',
-    'Surfing the queue.',
-    'The ball wobbled once…',
-];
-
-function WaitLine() {
-    const [i, setI] = useState(0);
-    const [typed, setTyped] = useState(0);
-    const line = WAIT_LINES[i % WAIT_LINES.length];
-
-    useEffect(() => {
-        // Randomised here, not during render, so SSR hydration still matches.
-        setI(Math.floor(Math.random() * WAIT_LINES.length));
-    }, []);
-
-    useEffect(() => {
-        if (typed < line.length) {
-            const t = setTimeout(() => setTyped(typed + 1), 45);
-
-            return () => clearTimeout(t);
-        }
-        // Line finished: hold it long enough to read, then start the next one.
-        const t = setTimeout(() => {
-            setI((n) => n + 1);
-            setTyped(0);
-        }, 1800);
-
-        return () => clearTimeout(t);
-    }, [typed, line]);
-
-    // The full line sits underneath, invisible, to reserve the box. Without it the button
-    // resizes on every character and the whole panel twitches for two minutes.
-    return (
-        <span className="relative inline-block whitespace-nowrap">
-            <span className="invisible">{line}</span>
-            <span className="absolute inset-0 text-left">{line.slice(0, typed)}</span>
-        </span>
     );
 }
 

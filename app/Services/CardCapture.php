@@ -8,32 +8,25 @@ use RuntimeException;
 use Symfony\Component\Process\Process;
 
 /**
- * The card as an embeddable image, captured from the REAL DOM card.
+ * The card as an embeddable image, screenshotted from the real card page.
  *
  *     ![my card](https://pokehub.dev/torvalds.gif)   animated, foil moving
  *     ![my card](https://pokehub.dev/torvalds.svg)   still
  *
- * Both come from the same screenshot pipeline, which is the whole point. The SVG used to be drawn
- * from primitives in PHP - a second implementation of the card - and it drifted from the real one
- * twice: once on font metrics, once on the weakness chart, so `/x.svg` and `/x.gif` printed
- * different bottom rows for the same profile. Capturing both removes the class of bug entirely,
- * along with ~400 lines that duplicated the card's geometry, fonts and type rules.
+ * Every format comes from one pipeline, so they cannot disagree with each other or with the page.
+ * The foil is the reason: holo.css layers blend modes driven by `--pointer-x/y`, which nothing but
+ * a browser can reproduce. Headless Chromium loads the public card page, walks a pointer across
+ * the face, and captures the frames.
  *
- * holo.css cannot be reproduced any other way regardless: the foil is layered blend modes driven
- * by `--pointer-x/y`, and an `<img>` has no pointer. So headless Chromium loads the actual public
- * card page, walks a mouse across the face, and screenshots it.
- *
- * A capture costs ~10-25s and a Chromium process, so results are cached to disk under a key that
- * includes the card's data: an unchanged card is never re-rendered, and a regenerate produces a
- * new file rather than serving a stale one. See DEPLOY.md for what a server needs.
+ * A capture costs roughly 10-25s and a Chromium process, so results are cached to disk under a key
+ * that includes the card's data: an unchanged card is never re-rendered, and an edit produces a
+ * new file. See DEPLOY.md for what a server needs.
  */
 class CardCapture
 {
     /**
-     * 24 frames x 90ms = a 2.16s loop, looping forever. 16 x 80ms was visibly stepped (a
-     * 22.5-degree jump per frame reads as judder), and 24 x 55ms fixed that but ran too fast to
-     * read. Slowing the timing means the capture path also has to tighten - see the amplitude
-     * note in capture-card.mjs - or a longer dwell on each step brings the stepping back.
+     * A 2.16s loop. Fewer frames read as judder, and a shorter delay runs too fast to follow; both
+     * are tied to the tilt amplitude in capture-card.mjs.
      */
     private const FRAMES = 24;
 
@@ -43,9 +36,8 @@ class CardCapture
     private const WIDTH = 320;
 
     /**
-     * `png` is the same still `svg` wraps, written raw. It exists for link previews: Open Graph
-     * scrapers reject SVG outright and several render only the first frame of a GIF, so a share
-     * card needs a plain raster. Warming it costs the same one shot the SVG already pays for.
+     * `png` is the same still image `svg` wraps, written raw, and exists for link previews: Open
+     * Graph scrapers reject SVG and several show only a GIF's first frame.
      *
      * @var string[]
      */
@@ -57,15 +49,11 @@ class CardCapture
     public function __construct(private readonly string $node = 'node') {}
 
     /**
-     * Absolute path for a card's capture, keyed on the card itself.
+     * Absolute path for a card's capture, keyed on the whole card blob.
      *
-     * The key used to be a hand-picked subset (axes, rarity, lore, followers, avatar) and it went
-     * stale the moment anything else printed on the card moved: the name an admin corrects in the
-     * lab, the star count that drives attack damage, the repo count behind the retreat cost. None
-     * of those writers calls forget(), so the README image simply kept serving the old card
-     * forever. Hashing the whole blob cannot fall behind the card by construction, and costs
-     * nothing extra - the only things in there that are NOT printed (top_repos, all_langs) change
-     * only on a regenerate, which re-renders anyway.
+     * Hashing everything rather than a hand-picked subset means the key cannot fall behind the
+     * card: any edit that changes what is printed changes the filename, without every writer
+     * having to remember to call forget().
      */
     public function path(string $slug, array $card, string $format): string
     {
@@ -77,19 +65,15 @@ class CardCapture
     /**
      * The cached capture, taking it first if this card has not been rendered in this format.
      *
-     * The whole miss branch is behind a per-card lock. The cache test is `is_file`, and the Node
-     * script only writes at the very END of a ~10-25s run, so every request that arrives during
-     * that window used to miss too: fifty concurrent hits on one uncached slug launched fifty
-     * Chromiums (~300MB each) and pinned fifty PHP workers for up to 180s. That is an outage from
-     * one curl loop, on an unauthenticated route. Now one request renders and the rest wait for
-     * its file - and re-test `is_file` when they get the lock, so they cost nothing.
+     * The miss branch is behind a per-card lock. The Node script only writes at the end of a long
+     * run, so without the lock every request arriving during that window also misses and launches
+     * its own Chromium: one curl loop on an unauthenticated route is enough to exhaust the box.
+     * Waiters re-test the file once they hold the lock, so they cost nothing.
      *
-     * The URL is built HERE, from APP_URL, and is deliberately not a parameter. The callers used
-     * to pass `url('/'.$slug)`, which in an HTTP request takes its host from the Host header - so
-     * `GET /victim.gif` with `Host: evil.test` screenshotted the attacker's page and cached it
-     * under the victim's slug (the key covers the slug and the card, not the host). One slug in,
-     * one page out: the address that is browsed can no longer disagree with the file it is
-     * written to. DEPLOY.md already requires APP_URL to be reachable from the server itself.
+     * The URL is built here from APP_URL rather than passed in. A caller-supplied `url()` takes
+     * its host from the request, which would let `Host: evil.test` screenshot an attacker's page
+     * and cache it under someone else's slug. DEPLOY.md requires APP_URL to be reachable from the
+     * server itself.
      */
     public function ensure(string $slug, array $card, string $format): string
     {
@@ -100,14 +84,13 @@ class CardCapture
             return $path;
         }
 
-        // Lock TTL (200s) > the capture timeout (180s), so it cannot expire under the holder and
-        // let a second Chromium in. Waiters give up at 60s (a capture is 10-25s) rather than
-        // holding a worker for the full render window; CardImageController turns that into a 502.
+        // The lock TTL exceeds the capture timeout, so it cannot expire under its holder and let a
+        // second Chromium in. Waiters give up well before that rather than holding a worker for a
+        // full render; CardImageController turns the timeout into a 502.
         //
-        // ponytail: bounds Chromium (one per card) but not WORKERS - a waiter still occupies one
-        // for up to 60s, and the lock is per-card, so N uncached cards still allow N browsers.
-        // Warming with `pokehub:card-image --all` on deploy is what keeps N at zero in practice
-        // (DEPLOY.md). Move capture to a queue and answer 202 if README traffic ever outruns that.
+        // This bounds Chromium per card, not per server: N uncached cards still allow N browsers.
+        // Warming with `pokehub:card-image --all` on deploy keeps N at zero in practice. If README
+        // traffic ever outruns that, move the capture to a queue and answer 202.
         return Cache::lock("card-capture:{$slug}.{$format}", 200)->block(60, function () use ($path, $url) {
             if (! is_file($path)) {
                 if (! is_dir(dirname($path))) {
@@ -123,10 +106,9 @@ class CardCapture
     /**
      * Drop every cached capture for a slug, so the next request re-renders. Returns the count.
      *
-     * The hash is matched digit by digit rather than with a bare `*`: slugs may contain hyphens
-     * and the hash is joined with one, so `{$slug}-*.*` also swept up `/foo-bar`'s files whenever
-     * `/foo` was forgotten - silently un-caching a stranger's README image (and over-reporting
-     * the count). `foo-bar-<hash>` cannot match `foo-<12 hex>` because of the second hyphen.
+     * The hash is matched digit by digit rather than with a bare `*`, because slugs may contain
+     * the same hyphen that joins the hash: `{$slug}-*.*` would also sweep up `/foo-bar`'s files
+     * whenever `/foo` was forgotten.
      */
     public function forget(string $slug): int
     {

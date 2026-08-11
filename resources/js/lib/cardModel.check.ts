@@ -71,16 +71,16 @@ const check = (name: string, cond: boolean) => {
     check('trainer keeps variant', r.variant === 'trainer');
 }
 
-// 2. The same axes on a Regular card all survive -- the guard must not over-fire.
+// 2. The same axes on a Regular card all survive, so the guard must not over-fire.
 {
     const r = resolveOverrides(options, pokemonAxes, rarity);
     check('regular keeps element', r.element === 'fire');
     check('regular keeps dualType', r.dualType === 'water');
     check('regular keeps subtype', r.subtype === 'stage1');
-    // The fixture is a 1-gen card, and 1-gen now has no icon control at all, so the icon is
-    // dropped here by GENERATION rather than by variant. The "a regular card keeps its icon"
-    // coverage therefore moves to a generation that actually offers the control.
-    check('1-gen regular drops iconUrl (no icon control upstream)', r.iconUrl === undefined);
+    // The fixture is a 1-gen card, which has no icon control at all, so the icon is dropped by
+    // generation rather than by variant. The "keeps its icon" case moves to a generation that
+    // does offer the control.
+    check('1-gen regular drops iconUrl (no icon control there)', r.iconUrl === undefined);
     check(
         'tcg-gen regular keeps iconUrl',
         resolveOverrides(options, { ...pokemonAxes, generation: 'tcg-gen' }, rarity).iconUrl === '/img/pcg/tcg-gen/icon-gx.webp',
@@ -88,8 +88,8 @@ const check = (name: string, cond: boolean) => {
     check('regular keeps evolvesFrom', r.evolvesFrom === 'Charmeleon');
 }
 
-// 3. Only 1-gen renders a trainer face, so only 1-gen gates. On tcg-gen the element must
-//    survive -- the card still draws a type-coloured basic-<type>.webp frame there.
+// 3. Only 1-gen renders a trainer face, so only 1-gen gates. On tcg-gen the element must survive,
+//    because the card still draws a type-coloured frame there.
 {
     const r = resolveOverrides(options, { ...pokemonAxes, generation: 'tcg-gen', variant: 'trainer' }, rarity);
     check('tcg-gen trainer KEEPS element (no trainer face there)', r.element === 'fire');
@@ -107,8 +107,7 @@ const check = (name: string, cond: boolean) => {
     check('1-gen drops a supporter subtype', r.subtype === undefined);
 }
 
-// 6. A set badge is TCG/SV-only. The playground always enforced this; the dashboard did not,
-//    so a saved 1-gen card can still carry one -- it must not render.
+// 6. A set badge is TCG Pocket and SV only, so a saved 1-gen card carrying one must not render it.
 {
     const r = resolveOverrides(options, { ...pokemonAxes, badge: 'paldea-evolved' }, rarity);
     check('1-gen drops a set badge', r.badgeUrl === undefined);
@@ -116,7 +115,7 @@ const check = (name: string, cond: boolean) => {
     check('tcg-gen keeps a set badge', t.badgeUrl === '/img/pcg/badges/badge-paldea-evolved.webp');
 }
 
-// 7. The "EDITION 1" stamp is Base Set art -- 1st gen only, on Regular AND Trainer.
+// 7. The "EDITION 1" stamp is Base Set art: 1st gen only, on both Regular and Trainer.
 {
     const one = resolveOverrides(options, { ...pokemonAxes, firstEdition: true }, rarity);
     check('1-gen keeps firstEdition', one.firstEdition === true);
@@ -146,8 +145,8 @@ const check = (name: string, cond: boolean) => {
     check('rarityMark: "none" omits the symbol', resolveOverrides(opts, { ...pokemonAxes, rarityMark: 'none' }, rarity).rarityMark === undefined);
 }
 
-// 8. rarityOf must ALWAYS return a Rarity. `activeRarity.tier` is dereferenced unconditionally,
-//    so an admin disabling the rarity_preset/common row used to white-screen every card.
+// 8. rarityOf must always return a Rarity. `activeRarity.tier` is dereferenced unconditionally, so
+//    an admin disabling the rarity_preset/common row would otherwise white-screen every card.
 {
     const presets = (rows: { slug: string; label: string; meta: unknown }[]) => raritiesFromOptions({ rarity_preset: rows } as never);
 
@@ -159,7 +158,7 @@ const check = (name: string, cond: boolean) => {
     check('rarityOf finds the asked-for preset', rarityOf(full, 'hyper').key === 'hyper');
     check('rarityOf falls back to common for an unknown key', rarityOf(full, 'nope').key === 'common');
 
-    // the reported break: `common` disabled, so /api/options.php never serves it
+    // `common` disabled, so /api/options never serves it
     const noCommon = presets([{ slug: 'hyper', label: 'Hyper', meta: { dr: 'hyper rare', tier: 'ultra', era: '151' } }]);
     const r = rarityOf(noCommon, 'nope');
     check('rarityOf survives a DB with NO common preset', r !== undefined && typeof r.tier === 'string');
@@ -301,16 +300,16 @@ const check = (name: string, cond: boolean) => {
     ];
     check(`match: the four showcase rows all differ (${showcase.join(' ')})`, new Set(showcase).size === 4);
 
-    // Two Python devs used to be indistinguishable here. Second language alone must split them.
+    // Two developers sharing a top language must still differ on the second one alone.
     check(
         'match: same top language, different second language -> different row',
         row('psychic', { langs: ['Python', 'Go'] }) !== row('psychic', { langs: ['Python', 'Rust'] }),
     );
 }
 
-// 11. The lab gallery must offer EVERY axis the settings panel offers, and gate them the same
-//     way. This replaced the old /lab page's coverage check: a wrong filter here silently drops
-//     a whole axis from "All variants" and the screen still looks fine.
+// 11. The lab gallery must offer every axis the settings panel offers, and gate them the same way.
+//     A wrong filter here silently drops a whole axis from "All variants" while the screen still
+//     looks fine.
 {
     const rows = (cat: string, slugs: string[], generation = '') =>
         slugs.map((slug) => ({ id: 0, category: cat, slug, label: slug, generation, asset_url: `/x/${slug}.webp`, meta: null }));

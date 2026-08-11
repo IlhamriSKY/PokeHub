@@ -45,21 +45,18 @@ const symbolName = (gen: AssetGen, t: Element) => (symbolsFor(gen).has(t) ? t : 
  * Does this generation actually ship a frame for this element?
  * FRAMES is the on-disk truth (verified against public/img/pcg/<gen>), so this is what the
  * Element picker must filter on: an element with no frame silently renders the normal one.
- * NOTE: deliberately keyed off FRAMES, not SYMBOLS -- the two sets differ on purpose.
- * SYMBOLS is a superset (1-gen ships dark/steel symbols with no dark/steel frame) because
- * the weakness/resistance row renders emblems for types that are not selectable as a frame.
+ * Keyed off FRAMES rather than SYMBOLS, which differ on purpose: SYMBOLS is a superset, because
+ * the weakness and resistance row renders emblems for types that are not selectable as a frame.
  */
 export const elementHasFrame = (gen: AssetGen, element: string) => framesFor(gen).has(BASE[element as Element]);
 
 /**
  * The energy disc for `t`, borrowing from tcg-gen when this generation ships none.
  *
- * The old fallback was the string 'normal', which does not mean "no art" - it means COLORLESS. So
- * a Metal card on Scarlet & Violet (a real, selectable type: `basic-steel.webp` exists, but
- * `scarlet-violet/steel.webp` does not) printed a colourless disc in its header socket, and a
- * Dragon or Fairy weakness on Base Set printed one in the weakness row. Wrong element beats
- * missing element for nobody. tcg-gen is the only complete symbol set, and the reference borrows
- * across generations the same way - it fetches `tcg-gen/water.webp` while rendering an SV card.
+ * Falling back to 'normal' would be wrong rather than merely missing: it means colourless, so a
+ * Metal card on Scarlet & Violet or a Dragon weakness on Base Set would print a colourless disc.
+ * tcg-gen is the only complete symbol set, and the reference generator borrows across generations
+ * the same way.
  */
 const energyUrl = (gen: AssetGen, t: Element): string => {
     for (const g of [gen, 'tcg-gen' as AssetGen]) {
@@ -72,8 +69,8 @@ const energyUrl = (gen: AssetGen, t: Element): string => {
 /**
  * 1st gen ships TWO frames per type: `<type>-basic.webp` and `<type>-stage.webp`. The stage
  * art bakes the gold sunburst pre-evolution box + the "evolves from" rule into the header.
- * Stage 1 and Stage 2 SHARE that one asset -- pokecardgenerator has no per-stage frame beyond
- * the pair (probed: `<type>-stage1.webp` 404s), only the stage label text differs.
+ * Stage 1 and Stage 2 share that one asset, since the reference ships no per-stage frame beyond
+ * the pair; only the stage label text differs.
  * tcg-gen/scarlet-violet ship no stage art, so they keep their single `basic-<type>.webp`.
  */
 const frameUrl = (gen: AssetGen, t: Element, stage = false) =>
@@ -147,15 +144,15 @@ export function PcgFace({
     const Emblem = ({ t }: { t: Element }) => <img className="pcg-emblem" src={energyUrl(gen, t)} alt={t} />;
     // Stage 1/2 on 1st gen swap to the evolution frame, which BAKES the sunburst pre-evo box
     // into the top-left of the name band. The name has to shift right to clear it whether or
-    // not an "evolves from" name was given -- so the layout keys off the stage, not off
-    // `evolvesFrom` (which only fills the baked box in). `is-stage` drives that in pcg.css.
-    // Keyed off the SUBTYPE only, not the generation: TCG Pocket also needs it (its frames bake
-    // the word "BASIC", so a Stage card must get the chrome overlay + a real label). Safe for the
-    // other gens - `frameUrl` ignores the stage flag unless gen==='1-gen', and only the gen-scoped
-    // `.gen-1-gen.is-stage` / `.gen-tcg-gen.is-stage` rules read the class.
+    // not an "evolves from" name was given, so the layout keys off the stage rather than off
+    // `evolvesFrom`, which only fills the baked box in. `is-stage` drives that in pcg.css.
+    // Keyed off the subtype alone, not the generation: TCG Pocket needs it too, since its frames
+    // bake in the word "BASIC" and a Stage card has to overlay a real label. Safe on the other
+    // generations, where `frameUrl` ignores the stage flag and only the generation-scoped
+    // `.is-stage` rules read the class.
     const isStage = STAGE_SUBTYPES.has(subtype ?? '');
     // Base Set "EDITION 1" stamp. Only 1st gen has the art (and upstream only offers the switch
-    // there), but it appears on BOTH the Regular and Trainer faces -- at different spots, which
+    // there), but it appears on both the Regular and Trainer faces at different spots, which
     // `.gen-1-gen.pcg-trainer .pcg-first-edition` re-anchors.
     const FirstEdition = () =>
         gen === '1-gen' && firstEdition ? <img className="pcg-first-edition" src="/img/pcg/1-gen/first-edition.webp" alt="1st edition" /> : null;
@@ -179,11 +176,9 @@ export function PcgFace({
                 <img className="pcg-frame" src="/img/pcg/1-gen/trainer.webp" alt="" />
                 {effectUrls?.map((u, i) => <img key={`${u}-${i}`} className="pcg-effect" src={u} alt="" />)}
                 <span className="pcg-trainer-name">{displayName}</span>
-                {/* A real Base Set Trainer has NO attacks -- just rules/effect text. The
-                    attacks were being rendered here as pseudo-effect lines ("Kernel Panic.
-                    ..."), which read as skills and contradicted this template's own intent.
-                    The flavor alone is the effect text now, and it is budgeted longer
-                    (GithubCardService::aiGenerate) to fill the plate that freed up. */}
+                {/* A real Base Set Trainer has no attacks, only rules text, so the effect line
+                    carries the plate alone. That is why GithubCardService budgets that string
+                    longer than the Pokemon face's flavour. */}
                 <div className="pcg-trainer-text">
                     <p className="pcg-trainer-flavor">{lore.effect || lore.flavor}</p>
                 </div>
@@ -203,11 +198,11 @@ export function PcgFace({
         );
     }
 
-    // TCG Pocket TRAINER templates (Trainer + Trainer Full Art). A trainer card has no type / HP /
-    // attacks / weakness -- just a name, artwork and rules text. Frames are real pokecardgenerator
-    // assets: trainer-<sub>.webp (windowed: photo window x8.8-91% y14.6-51.3%, rules area below) for
-    // Trainer, or trainer-full-art.webp (a holo border with a transparent centre -> full-bleed art)
-    // for Trainer Full Art. The trainer sub-type (Supporter/Item/Stadium/Tool) rides the subtype axis.
+    // TCG Pocket Trainer templates, both Trainer and Trainer Full Art. A trainer card has no type,
+    // attacks or weakness, only a name, artwork and rules text. Two frame assets back them:
+    // trainer-<sub>.webp has a photo window with the rules area below it, while
+    // trainer-full-art.webp is a holo border with a transparent centre for full-bleed art. The
+    // trainer sub-type (Supporter, Item, Stadium, Tool) rides the subtype axis.
     if (gen === 'tcg-gen' && (variant === 'trainer' || variant === 'trainer-full-art')) {
         const fa = variant === 'trainer-full-art';
         const trSub = ['supporter', 'item', 'stadium', 'tool'].includes(subtype ?? '') ? subtype : 'supporter';
@@ -238,7 +233,7 @@ export function PcgFace({
                     </>
                 )}
                 {/* name is a big LEFT-aligned title on its own row below the "Supporter | TRAINER"
-                    header, with HP on the right -- exactly like pokecardgenerator's trainer layout. */}
+                    header, with HP on the right, matching the reference trainer layout. */}
                 <span className="pcg-tr-name">{displayName}</span>
                 <span className="pcg-tr-hp">
                     <small>HP</small> {fmt(d.followers)}
@@ -353,10 +348,10 @@ export function PcgFace({
                 hole showing the artwork through it and shunting HP off its mark at the same time. */}
             {!bakedPrimary && !dual && <img className="pcg-emblem pcg-sv-emblem" src={energyUrl(gen, type)} alt={type} />}
 
-            {/* Pre-evolution well. The 1st-gen stage frames BAKE an empty sunburst box, so fill it
-                with the card's own avatar even when no "evolves from" name was given -- an empty
-                box reads as unfinished. The name line still only shows when a pre-evolution was
-                actually named. Other gens keep the old behaviour (chip only when a name exists). */}
+            {/* Pre-evolution well. The 1st-gen stage frames bake an empty sunburst box, so it is
+                filled with the card's own avatar even when no "evolves from" name was given.
+                The name line still appears only when one was. Other generations show the chip
+                only when a name exists. */}
             {((gen === '1-gen' && isStage) || (evolvesFrom && !(gen === 'tcg-gen' && isStage))) && (
                 <div className="pcg-evolve">
                     <img src={avatarUrl(d.avatar, 64)} alt="" />

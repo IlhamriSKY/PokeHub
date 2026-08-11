@@ -11,10 +11,12 @@ use Spatie\Permission\Models\Role;
 use Spatie\Permission\PermissionRegistrar;
 
 /**
- * PokeHub roles & permissions. Two roles:
+ * Roles and permissions. Two roles:
+ *
  *  - admin: full dashboard access (users, roles, slugs, card assets, activity)
  *  - user:  authors their own public card, nothing else
- * Seeds an admin account so the dashboard is reachable out of the box.
+ *
+ * Also seeds an admin account, so the dashboard is reachable out of the box.
  */
 class RolesAndPermissionsSeeder extends Seeder
 {
@@ -45,20 +47,14 @@ class RolesAndPermissionsSeeder extends Seeder
         User::doesntHave('roles')->each(fn (User $u) => $u->assignRole('user'));
 
         /*
-         * Bootstrap admin. Deliberately NOT a fixed password any more.
+         * The bootstrap admin, with no fixed password. This seeder runs on every deploy, so a
+         * hardcoded one would mint a privileged account with a guessable credential and reset it
+         * again each time an operator rotated it.
          *
-         * This block used to hardcode Hash::make('password') on admin@pokehub.dev, and
-         * DatabaseSeeder calls this seeder unconditionally - while the README's deploy step is
-         * `php artisan migrate --seed --force`. So every deployment minted a fully-privileged
-         * account with a guessable password, and because it is updateOrCreate, an operator who
-         * rotated that password got it reset back on the next seed.
-         *
-         * Now: with no ADMIN_PASSWORD set we generate a random one that nobody knows. There is no
-         * password login at all any more (registration, password reset and POST /login were all
-         * removed - GitHub OAuth is the only way in), so the hash is a placeholder, not a
-         * credential: the account is CLAIMED by signing in with GitHub on an account whose primary
-         * address is ADMIN_EMAIL. `email_verified_at` below is what lets the OAuth callback match
-         * it. An EXISTING admin's password is never overwritten either way.
+         * With no ADMIN_PASSWORD set the hash is random and unknown. Nothing signs in with it:
+         * GitHub OAuth is the only way in, so the account is claimed by signing in with GitHub on
+         * an account whose primary address is ADMIN_EMAIL, which `email_verified_at` below lets
+         * the callback match. An existing admin's password is never overwritten.
          */
         $adminEmail = env('ADMIN_EMAIL', 'admin@pokehub.dev');
         $existing = User::where('email', $adminEmail)->first();
@@ -67,7 +63,7 @@ class RolesAndPermissionsSeeder extends Seeder
             ['email' => $adminEmail],
             array_filter([
                 'name' => $existing?->name ?: 'PokeHub Admin',
-                // only set a password when creating, or when one was explicitly supplied
+                // Only set a password when creating, or when one was explicitly supplied.
                 'password' => $existing && ! env('ADMIN_PASSWORD')
                     ? null
                     : Hash::make(env('ADMIN_PASSWORD') ?: Str::random(40)),

@@ -170,8 +170,8 @@ export default function AdminAssets({ categories, assets }: { categories: string
                         <AlertDescription>{flash.success}</AlertDescription>
                     </Alert>
                 )}
-                {/* The server validates hard (JSON meta, slug clashes, asset_url origin). None of
-                    it used to be rendered, so a rejected save looked like a no-op. */}
+                {/* The server validates JSON meta, slug clashes and asset_url origin, so those
+                    errors have to surface here or a rejected save looks like a no-op. */}
                 {Object.keys(errors).length > 0 && (
                     <Alert variant="destructive">
                         <AlertDescription>

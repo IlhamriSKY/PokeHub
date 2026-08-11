@@ -33,9 +33,9 @@ const TCG_TYPE_LABEL: Record<string, string> = { lightning: 'Electric', metal: '
 const SearchCtx = createContext('');
 
 /**
- * One labelled control. When a search is active it removes ITSELF if neither its name nor any of
- * its option labels match, which is what makes the box find "fairy" (an option buried inside two
- * dropdowns) as readily as "dual" (a field name).
+ * One labelled control. Under an active search it removes itself unless its own name or one of its
+ * option labels matches, so the box finds an option buried in a dropdown as readily as a field
+ * name.
  */
 function Field({ label, keywords, children }: { label: string; keywords?: string[]; children: ReactNode }) {
     const q = useContext(SearchCtx).trim().toLowerCase();
@@ -449,8 +449,8 @@ export function CardSettings({
                     </Field>
                 )}
 
-                {/* One effect, not the playground's stack of five: the saved blob holds a single slug,
-                so offering five here would silently drop four on save. */}
+                {/* One effect rather than a stack: the saved blob holds a single slug, so
+                    offering several here would silently drop all but one on save. */}
                 <Field label="Visual effect" keywords={kw(options.effect)}>
                     <Select value={a.effect} onValueChange={(v) => set({ effect: v })}>
                         <SelectTrigger className="h-9">

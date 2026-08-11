@@ -9,9 +9,10 @@ use App\Models\User;
 use Illuminate\Support\Facades\Cache;
 
 /**
- * The card lab, server side. Two kinds of card can be restyled - a user's own card and a
- * landing-page showcase card - and they live in different tables, so the panel addresses both
- * through one "type:id" handle.
+ * The card lab, server side.
+ *
+ * Two kinds of card can be restyled, a user's own and a landing-page showcase card, and they live
+ * in different tables. The panel addresses both through one "type:id" handle.
  */
 class CardSettingsService
 {
@@ -117,11 +118,9 @@ class CardSettingsService
     /**
      * Fold edited prose back into a stored lore blob, keeping keys the form does not own.
      *
-     * Key by key, because every `text.*` rule is `nullable`: a payload that omits `species` does
-     * not carry the key at all, and reading it blind either raised four "Undefined array key"
-     * warnings into a 500 (APP_DEBUG on) or wrote four nulls and blanked the card's prose. Absent
-     * means "not edited"; present-and-null means cleared (ConvertEmptyStringsToNull), so it is
-     * kept as an empty value rather than restored.
+     * Checked key by key, because every `text.*` rule is nullable and the two absences mean
+     * different things: a missing key was not edited, while a present null was cleared by
+     * ConvertEmptyStringsToNull and should stay empty.
      */
     private function mergeLore(?array $lore, array $text): array
     {
@@ -148,15 +147,14 @@ class CardSettingsService
             if (! $row) {
                 return false;
             }
-            // array_key_exists, not `??`: the caption is nullable and the middleware turns a
-            // cleared field into null, so `$text['why'] ?? $row->why` put the old caption straight
-            // back and the homepage kept printing what the admin had just deleted.
+            // array_key_exists rather than `??`, so clearing the caption actually clears it: the
+            // middleware turns an empty field into null, which `??` would read as "not sent".
             $why = array_key_exists('why', (array) $text) ? ['why' => $text['why']] : [];
             $row->update(['axes' => $axes, 'rarity' => $rarity] + $why);
 
             if ($text) {
-                // Card prose lives on the cached profile row, which is what actually renders -
-                // the showcase row only carries the editorial caption.
+                // Card prose lives on the cached profile row, which is what renders. The showcase
+                // row only carries the editorial caption.
                 $profileRow = Profile::find($row->login);
                 if ($profileRow) {
                     $card = (array) $profileRow->card_json;
@@ -166,8 +164,8 @@ class CardSettingsService
                     $profileRow->update(['card_json' => $card, 'github_json' => $github]);
                 }
             }
-            // The landing page caches its showcase for an hour; an edit nobody can see for an
-            // hour reads as a bug, so drop the key rather than wait it out.
+            // The landing page caches its showcase for an hour, so drop the key rather than let an
+            // edit sit invisible until it expires.
             Cache::forget(LandingController::CACHE_KEY);
 
             return true;

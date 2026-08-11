@@ -12,12 +12,12 @@ Route::middleware('guest')->group(function () {
     Route::get('login', [AuthenticatedSessionController::class, 'create'])
         ->name('login');
 
-    // Throttled: the callback creates users, so it is an unauthenticated write path.
+    // Throttled, because the callback creates users and is therefore an unauthenticated write.
     //
-    // Deliberately NOT captcha-gated: GitHub's own OAuth screen is the bot check, so a Turnstile
-    // here would only add a second challenge in front of a challenge. Turnstile stays on the
-    // dashboard's card-regen, where the thing being protected is a paid AI call rather than a
-    // sign-in that Google and GitHub already police.
+    // Not captcha-gated: GitHub's own OAuth screen is already the bot check, so a Turnstile here
+    // would put a second challenge in front of a challenge. Turnstile stays on card generation,
+    // where what is being protected is a paid AI call rather than a sign-in GitHub already
+    // polices.
     Route::get('auth/github/redirect', [GithubController::class, 'redirect'])
         ->middleware('throttle:10,1')
         ->name('github.redirect');

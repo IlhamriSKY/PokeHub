@@ -12,26 +12,16 @@ use Spatie\Permission\Middleware\RoleMiddleware;
 use Spatie\Permission\Middleware\RoleOrPermissionMiddleware;
 
 /**
- * Read .env through $_ENV/$_SERVER only -- never getenv()/putenv().
+ * Read .env through $_ENV/$_SERVER only, never getenv()/putenv().
  *
- * putenv() writes to the PROCESS, not the request. Apache here is mod_php with 64 worker
- * THREADS in a single process shared by every Laragon site, and Laravel's Env repository
- * registers a PutenvAdapter by default. So a request to a neighbouring Laravel app leaks its
- * whole .env into this process, and because Dotenv loads IMMUTABLY it then refuses to
- * overwrite those values for us -- PokeHub would boot with someone else's config.
+ * putenv() writes to the process rather than the request. Under a threaded mod_php where several
+ * sites share one process, a neighbouring Laravel app leaks its whole .env in, and because Dotenv
+ * loads immutably this app then refuses to overwrite those values: it boots with another site's
+ * config, which surfaces as intermittent failures depending on which app last used the thread.
  *
- * That was not theoretical: hitting SIASKA-NEW (SESSION_DRIVER=redis, REDIS_CLIENT=predis)
- * and then pokehub.dev made PokeHub 500 four times out of five with
- * `Class "Predis\Client" not found` from PredisConnector -- PokeHub is database-session and
- * has no predis -- while rendering SIASKA's APP_NAME. Requests to PokeHub alone failed ~30%
- * of the time for the same reason, depending on which app last used that worker thread.
- *
- * Disabling putenv makes this app both immune (it stops READING the process-global values)
- * and a good neighbour (it stops WRITING its own). It must run before the framework's
- * LoadEnvironmentVariables bootstrapper, i.e. here, above Application::configure().
- *
- * Note this only protects PokeHub; other Laragon apps still poison each other until they do
- * the same, or until PHP is served per-app (FastCGI/FPM) instead of one shared mod_php process.
+ * Disabling putenv makes this app both immune (it stops reading the process-global values) and a
+ * good neighbour (it stops writing its own). It has to run before the framework's
+ * LoadEnvironmentVariables bootstrapper, so it lives here rather than in a service provider.
  */
 Env::disablePutenv();
 

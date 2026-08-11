@@ -82,7 +82,7 @@ class AdminAssetCrudTest extends TestCase
         $this->assertNotNull(CardAsset::find($asset->id));
     }
 
-    /** Malformed meta must fail loudly - it used to fall through to null and silently wipe the row. */
+    /** Malformed meta must fail loudly rather than fall through to null and wipe the row. */
     public function test_malformed_meta_json_is_rejected()
     {
         $this->actingAs($this->admin())
@@ -135,7 +135,7 @@ class AdminAssetCrudTest extends TestCase
             ->assertSessionHasErrors('file');
     }
 
-    /** Renaming a row onto an existing (category, slug, generation) used to 500 on the unique key. */
+    /** Renaming a row onto an existing (category, slug, generation) hits the unique key. */
     public function test_a_slug_clash_is_a_field_error_not_a_500()
     {
         $admin = $this->admin();

@@ -41,10 +41,8 @@ class PublicCardsController extends Controller
             'cards' => $cards,
             'q' => $q,
             'rarity' => $rarity,
-            // The landing page's four, folded into the same grid as everyone else rather than
-            // pinned above it as a feature strip. They are cards in the gallery, so they answer to
-            // the search box and the rarity filter like every other card - a fixed row that ignored
-            // the query would just be four results that refuse to go away.
+            // Folded into the same grid as everyone else, so they answer to the search box and the
+            // rarity filter like any other card rather than sitting above them as a fixed strip.
             'showcase' => $this->showcase($q, $rarity),
             'seo' => Seo::private('Card gallery | PokeHub'),
         ]);
@@ -53,12 +51,12 @@ class PublicCardsController extends Controller
     /**
      * The landing showcase, filtered by the same terms as the card query.
      *
-     * Matched in PHP rather than SQL because these live in `showcase_cards` and their renderable
-     * payload is assembled from a cached `profiles` row - there is no single query that returns
-     * them and the users together. Four rows, so the cost of filtering them here is nothing.
+     * Matched in PHP rather than SQL, because these live in `showcase_cards` and their renderable
+     * payload is assembled from a cached `profiles` row: no single query returns them and the
+     * users together. It is a handful of rows, so filtering them here costs nothing.
      *
-     * They are appended to the FIRST page only. The user list is paginated, and repeating four
-     * fixed cards at the top of every page would push real results off the screen.
+     * Appended to the first page only, since repeating them above every page of a paginated list
+     * would push real results off the screen.
      *
      * @return array<int, array<string, mixed>>
      */

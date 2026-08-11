@@ -10,12 +10,11 @@ use Illuminate\Console\Command;
 use Throwable;
 
 /**
- * Re-capture a card's README images (both formats).
+ * Re-capture a card's README images.
  *
- * The web route only renders when a card has no cached file, and the cache key is the card's own
- * data - so a card that has not changed is never re-rendered, and a change to the CAPTURE itself
- * (frame count, timing, background) would otherwise never reach cards that are already cached.
- * This is the way to force it, and the way to warm a fresh deploy before anyone's README asks.
+ * The web route only renders a card with no cached file, and the cache key is the card's own data,
+ * so a change to the capture itself (frame count, timing, background) never reaches cards that are
+ * already cached. This forces it, and warms a fresh deploy before anyone's README asks.
  */
 class RegenerateCardImages extends Command
 {
@@ -50,7 +49,7 @@ class RegenerateCardImages extends Command
         foreach ($slugs as $slug) {
             $found = $lookup->find($slug);
             if (! $found) {
-                $this->warn("  skip {$slug} - not a public card");
+                $this->warn("  skip {$slug}: not a public card");
 
                 continue;
             }

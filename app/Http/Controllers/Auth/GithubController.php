@@ -3,7 +3,9 @@
 namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
+use App\Models\Profile;
 use App\Models\User;
+use App\Services\GithubCardService;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
 use Laravel\Socialite\Facades\Socialite;
@@ -25,7 +27,7 @@ class GithubController extends Controller
     {
         try {
             $githubUser = Socialite::driver('github')->user();
-        } catch (Throwable $e) {
+        } catch (Throwable) {
             return redirect()->route('login')->with('status', 'GitHub sign-in failed. Please try again.');
         }
 
@@ -36,15 +38,13 @@ class GithubController extends Controller
         $user = User::where('github_id', $githubId)->first();
 
         /*
-         * GitHub only hands back a VERIFIED primary address, so the incoming half is trustworthy -
-         * but the stored half was not: /settings/profile lets any signed-in user set `email` to
-         * anything, unverified. So an attacker could park a victim's GitHub address on their own
-         * row and wait; the victim's first sign-in would miss on github_id, fall through to here,
-         * and log them into the attacker's account (pre-seeded slug and card included).
+         * Only match a row whose address this app verified itself. GitHub hands back a verified
+         * primary address, but /settings/profile lets any signed-in user claim an arbitrary one,
+         * so matching on the stored address alone would let an attacker park a victim's GitHub
+         * email on their own row and capture that victim's first sign-in.
          *
-         * Only match a row whose address this app actually verified. Rows created below get
-         * email_verified_at from GitHub; a self-edited address is null until re-verified, so it
-         * can no longer capture anyone.
+         * Rows created below take email_verified_at from GitHub; a self-edited address stays null
+         * until re-verified.
          */
         if (! $user && $email) {
             $user = User::where('email', $email)->whereNotNull('email_verified_at')->first();
@@ -55,11 +55,10 @@ class GithubController extends Controller
             $isNew = true;
             $user = new User;
             /*
-             * Reaching here with a non-null $email that is already taken means it is parked on an
-             * UNVERIFIED row - the match above skipped it. users.email is unique, so simply
-             * assigning it threw SQLSTATE 23000 and the victim's sign-in 500'd: the squatter still
-             * won, just by blocking registration instead of capturing it. Fall back to GitHub's own
-             * noreply form, which is keyed on the numeric account id.
+             * An address that is taken at this point is parked on an unverified row, since the
+             * match above skipped it. users.email is unique, so assigning it anyway would fail the
+             * insert and block this sign-in entirely. Fall back to GitHub's noreply form, which is
+             * keyed on the numeric account id.
              */
             $taken = $email && User::where('email', $email)->exists();
             $user->email = $this->uniqueEmail(
@@ -72,13 +71,31 @@ class GithubController extends Controller
         $user->github_id = $githubId;
         $user->github_login = $login;
         $user->avatar = $githubUser->getAvatar() ?: $user->avatar;
-        // Only the address GitHub just vouched for. Stamping on any non-empty $email marked the
-        // STORED one verified, which for a returning user is whatever they last typed into
-        // /settings/profile - so a self-set address they do not own came back verified and became
-        // a valid capture target for the match above. Same guard, other end.
+        // Only stamp the address GitHub just vouched for. Stamping on any non-empty $email would
+        // mark a self-set address verified and turn it into a capture target for the match above.
         if (! $user->email_verified_at && $email && $user->email === $email) {
             $user->email_verified_at = now();
         }
+
+        /*
+         * The claim. Anyone can generate this handle's card from the home page, so by the time its
+         * owner signs in the card usually exists already; adopting it beats an empty dashboard and
+         * a free generation spent on a card the site has published under their name.
+         *
+         * Only when they have none, so a returning user's restyled card is never overwritten by
+         * the unstyled row a stranger's search left behind.
+         */
+        if (! $user->card && $login) {
+            [$github, $card] = Profile::find(strtolower($login))?->split() ?? [null, null];
+            if (is_array($github) && ! empty($github['login'])) {
+                $user->card = [
+                    'profile' => $github + ['ai' => $card['ai'] ?? null],
+                    'rarity' => app(GithubCardService::class)->rarityFor($login, $github),
+                    'axes' => [],
+                ];
+            }
+        }
+
         $user->save();
 
         if ($isNew && ! $user->hasRole('user')) {
@@ -91,9 +108,8 @@ class GithubController extends Controller
     }
 
     /**
-     * Disambiguate with plus-addressing. The noreply seed already carries the unique GitHub id, so
-     * this only fires if someone parked that exact string on their row - cheap insurance against
-     * the one remaining way to block a stranger's first sign-in.
+     * Disambiguate a colliding address by suffixing the local part. The noreply seed already
+     * carries the unique GitHub id, so this only fires if someone parked that exact string.
      */
     private function uniqueEmail(string $seed): string
     {

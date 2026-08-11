@@ -23,25 +23,43 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         /*
-         * The burst half of the card-regenerate control. Five presses a day may all land in the
-         * same second, and each one holds a worker for the length of the AI timeout.
+         * The burst half of the card-regenerate control: a day's presses can all land in the same
+         * second, and each one holds a worker for the length of the AI timeout.
          *
-         * The DAILY quota is not here: the dashboard has to print how much of it is spent and when
-         * it resets, and a middleware limit's counter cannot be read back out without duplicating
-         * ThrottleRequests' key derivation. It lives in App\Services\RegenQuota, which the
-         * controller both enforces and renders from. See the note in that class.
+         * The daily quota lives in App\Services\RegenQuota instead, because the dashboard has to
+         * print how much of it is spent and a middleware limit's counter cannot be read back out
+         * without duplicating ThrottleRequests' key derivation.
          *
-         * A named limiter rather than plain `throttle:3,1` only for the response - the default 429
-         * is a bare error page to an Inertia POST, where this lands in the `card` error bag the
-         * dashboard already renders.
+         * Named rather than `throttle:3,1` only for the response: the default 429 is a bare error
+         * page to an Inertia POST, where this lands in the error bag the dashboard renders.
          */
         RateLimiter::for('card-regen', function (Request $request) {
             $user = $request->user();
             $id = $user?->github_id ?: ($user?->id ?: $request->ip());
 
             return Limit::perMinute(3)->by('burst:'.$id)->response(fn () => back()->withErrors([
-                'card' => 'Too many regenerations at once - give it a minute.',
+                'card' => 'Too many regenerations at once. Give it a minute.',
             ]));
+        });
+
+        /*
+         * The home page's public search. There is no account to key a quota on, so the IP carries
+         * both halves: a burst limit because one miss holds a worker for the AI timeout, and a
+         * daily one because a miss is also a paid completion.
+         *
+         * Repeat searches for an already-cached handle are the common case and cost only a
+         * primary-key read, so most visitors never meet either limit.
+         */
+        RateLimiter::for('card-generate', function (Request $request) {
+            $by = $request->user()?->id ?: $request->ip();
+            $tooFast = fn () => back()->withErrors(['login' => 'Too many lookups at once. Give it a minute.']);
+
+            return [
+                Limit::perMinute(4)->by('generate:burst:'.$by)->response($tooFast),
+                Limit::perDay(20)->by('generate:daily:'.$by)->response(fn () => back()->withErrors([
+                    'login' => 'That is enough card generating for one day. Try again tomorrow.',
+                ])),
+            ];
         });
     }
 }

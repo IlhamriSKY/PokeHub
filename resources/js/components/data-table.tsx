@@ -15,8 +15,7 @@ export type Paginated<T> = {
 
 /**
  * The shell every admin table shares: card frame, toolbar row, header styling, empty state and
- * footer. Four pages had four hand-rolled copies of this markup, which is why they had drifted
- * into three different header treatments and one table with no header at all.
+ * footer. One copy, so the admin pages cannot drift into different table treatments.
  */
 export function DataTable({
     toolbar,

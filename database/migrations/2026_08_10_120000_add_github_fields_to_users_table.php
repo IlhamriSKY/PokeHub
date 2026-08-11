@@ -5,12 +5,11 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
 /**
- * GitHub sign-in. PokeHub builds a card FROM a GitHub profile, so GitHub is the identity that
- * actually matters here - `github_login` is both the OAuth link and the handle the card is
- * generated from, which is why it is stored rather than re-derived on every render.
+ * GitHub sign-in. `github_login` is both the OAuth link and the handle a card is generated from,
+ * so it is stored rather than re-derived on every render.
  *
- * Mirrors the existing google_id/avatar pair. Nullable because password and Google accounts
- * predate it, and uniquely indexed so two PokeHub users can never claim one GitHub identity.
+ * Nullable, because accounts created before GitHub sign-in have neither, and uniquely indexed so
+ * two users can never claim one GitHub identity.
  */
 return new class extends Migration
 {

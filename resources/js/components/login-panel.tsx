@@ -10,9 +10,9 @@ import { useCallback, useEffect } from 'react';
  * in place. Both visits use preserveScroll + preserveState, which is what keeps the landing from
  * jumping back to the top and re-running the showcase render underneath.
  *
- * Deliberately not the shadcn Dialog: that portals to document.body, and the whole point here is
- * that the landing stays visibly behind a blur rather than being replaced. The focus and Escape
- * behaviour a dialog would have given us is wired by hand below.
+ * Not the shadcn Dialog, which portals to document.body: the landing has to stay visible behind a
+ * blur rather than being replaced. The focus and Escape handling a dialog would provide is wired
+ * by hand below.
  */
 export default function LoginPanel({ status }: { status?: string }) {
     const close = useCallback(() => {
@@ -24,8 +24,8 @@ export default function LoginPanel({ status }: { status?: string }) {
             if (e.key === 'Escape') close();
         };
         document.addEventListener('keydown', onKey);
-        // The landing behind is still a scrollable page; letting it scroll under an open panel
-        // reads as a bug on a trackpad.
+        // The landing behind is still a scrollable page, and letting it scroll under an open
+        // panel is jarring on a trackpad.
         const prev = document.body.style.overflow;
         document.body.style.overflow = 'hidden';
 
@@ -81,9 +81,7 @@ export default function LoginPanel({ status }: { status?: string }) {
                         Continue with GitHub
                     </a>
 
-                    <p className="text-muted-foreground text-center text-xs">
-                        New here? Signing in creates your account. We never ask for repository access.
-                    </p>
+                    <p className="text-muted-foreground text-center text-xs">New here? Signing in creates your account.</p>
 
                     {status && <div className="text-center text-sm font-medium text-green-600">{status}</div>}
                 </div>

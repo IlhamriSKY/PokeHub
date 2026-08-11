@@ -34,8 +34,8 @@ class DashboardController extends Controller
                 'github_login' => $user->github_login,
                 'public_url' => $user->slug ? url('/'.$user->slug) : null,
             ],
-            // Top-level, not nested in `profile`: the countdown reloads just this key when it
-            // reaches zero, and a partial reload can only ask for a root prop.
+            // Top-level rather than nested in `profile`, because the countdown reloads this key on
+            // its own and a partial reload can only ask for a root prop.
             'quota' => (new RegenQuota($user))->toArray(),
         ]);
     }
@@ -53,32 +53,26 @@ class DashboardController extends Controller
 
     public function regenerate(Request $request, GithubCardService $svc)
     {
-        // Same headroom Api\GithubController gives itself, and for the same reason: the AI call
-        // alone is allowed 120s by config, which is longer than PHP's default max_execution_time -
-        // so without this the worker was killed mid-call and the regenerate reported "the AI never
-        // answered" on a model that was about to reply.
+        // The AI call alone is allowed 120s by config, which is longer than PHP's default
+        // max_execution_time. Without this the worker is killed before the model replies.
         @set_time_limit((int) config('pokehub.ai.timeout', 60) + 60);
 
-        // The re-rolled card (see rollAxes in card-gallery.tsx). Rolled client-side because the
-        // legality rules - which frame belongs to which generation, what a Trainer template drops -
-        // live in the lab's own tiles and nowhere else; duplicating them here would be a second
-        // copy to drift. What the server owes is the trust boundary: every slug has to name a real,
-        // ENABLED asset, so a hand-made POST cannot pin the card to something that renders nothing.
-        // One query, grouped, rather than a lookup per axis.
+        // Axes are re-rolled client-side (rollAxes in card-gallery.tsx), because the legality
+        // rules live in the lab's tiles and a second copy here would drift. What the server owes
+        // is the trust boundary: every slug must name a real, enabled asset, so a hand-made POST
+        // cannot pin the card to something that renders nothing.
         $slugs = CardAsset::where('enabled', true)->get(['category', 'slug'])->groupBy('category')->map->pluck('slug');
         $in = fn (string $category, string ...$extra) => Rule::in($slugs->get($category, collect())->merge($extra));
 
-        // The rule is implicit (see App\Rules\Turnstile), so it runs on a missing token too and
-        // rejects it itself; it no-ops when Turnstile is off. No `nullable` here - that would put
-        // the skip back.
+        // The Turnstile rule is implicit, so it rejects a missing token itself and no-ops when
+        // Turnstile is off. Adding `nullable` here would put the skip back.
         $data = $request->validate([
             'cf-turnstile-response' => [new TurnstileRule],
             'axes' => ['nullable', 'array'],
             'axes.generation' => ['nullable', $in('generation')],
             'axes.variant' => ['nullable', $in('variant', 'none')],
-            // 'auto' like its siblings: rollAxes leaves element at the DEFAULT_AXES sentinel
-            // whenever the roll lands on a template with no type section (1-gen Trainer), and
-            // rejecting it 422'd the auto-generate that a brand-new account depends on.
+            // 'auto' is allowed like its siblings: rollAxes leaves element at the DEFAULT_AXES
+            // sentinel whenever the roll lands on a template with no type section.
             'axes.element' => ['nullable', $in('element', 'auto')],
             'axes.dualType' => ['nullable', $in('element', 'auto')],
             'axes.subtype' => ['nullable', $in('subtype', 'auto')],
@@ -91,10 +85,10 @@ class DashboardController extends Controller
             'axes.effect' => ['nullable', $in('effect', 'none')],
             // Not an asset row: ATTRIBUTE_FRAMES is a CSS style list in cardModel.ts.
             'axes.attributeFrame' => ['nullable', Rule::in(['none', 'grey', 'shining', 'black', 'mega'])],
-            // Free text (a pre-evolution name), so length is the only real bound.
+            // Free text (a pre-evolution name), so length is the only bound.
             'axes.evolvesFrom' => ['nullable', 'string', 'max:40'],
-            // firstEdition is deliberately absent: it is a print-run fact the server derives from
-            // account age below, not something a client gets to claim.
+            // firstEdition is absent on purpose: the server derives it from account age below,
+            // rather than letting a client claim it.
         ]);
 
         $user = Auth::user();
@@ -105,21 +99,21 @@ class DashboardController extends Controller
         }
 
         /*
-         * The daily quota, spent HERE rather than by the middleware: a press that never reaches the
-         * AI - a captcha typo, an axis slug that no longer exists - should not cost a generation.
-         * The burst limiter still bounds how fast those can be thrown. Admins are not blocked, but
-         * they are still counted, so the panel shows their real usage against the same cap.
+         * The daily quota is spent here rather than by middleware, so a press that never reaches
+         * the AI (a captcha typo, a stale axis slug) does not cost a generation. The burst limiter
+         * still bounds how fast those can be thrown.
          */
         $quota = new RegenQuota($user);
         if ($quota->exceeded()) {
             $resets = now()->addSeconds($quota->resetsIn())->diffForHumans();
 
             return back()->withErrors([
-                'card' => "Daily limit reached - {$quota->limit()} card generations per day. Resets {$resets}.",
+                'card' => "Daily limit reached: {$quota->limit()} card generations per day. Resets {$resets}.",
             ]);
         }
         // Spends the free welcome generation if this identity still has one, otherwise the daily
-        // pot. Either way it is spent before the AI call, so a press that reaches the model counts.
+        // pot. Either way it is spent before the AI call, so every press that reaches the model
+        // is counted.
         $quota->spend();
 
         [$gh, $err] = $svc->ghGet('https://api.github.com/users/'.rawurlencode($login));
@@ -135,9 +129,8 @@ class DashboardController extends Controller
         if (! empty($ai['enabled']) && ! empty($ai['key'])) {
             $profile['readme'] = $svc->fetchReadme($login);
             $profile['orgs'] = $svc->fetchOrgs($login);
-            // A timed-out AI returns null; keep the existing lore rather than wiping it - but say
-            // so below. Keeping it QUIETLY is how a broken endpoint went unnoticed: every press
-            // flashed "regenerated" in green while the card never changed a word.
+            // A timed-out AI returns null. Keep the existing lore rather than wiping it, but say
+            // so below: keeping it quietly makes a broken endpoint look like a successful press.
             $lore = $svc->aiGenerate($profile);
             $loreFailed = $lore === null;
             $profile['ai'] = $lore ?? ($user->card['profile']['ai'] ?? null);
@@ -148,19 +141,14 @@ class DashboardController extends Controller
         $user->card = [
             'profile' => $profile,
             'rarity' => $profile['rarity'],
-            // Axes are the client's vocabulary; an empty blob means "defaults". The server seeds
-            // one: the 1st Edition stamp marks a first print run, so it goes to the accounts that
-            // were here first, and only the profile knows how old an account is. resolveOverrides
-            // still drops it on any frame but Base Set.
+            // Axes are the client's vocabulary, and an empty blob means defaults. The server seeds
+            // only firstEdition, since the 1st Edition stamp marks a first print run and only the
+            // profile knows how old an account is. resolveOverrides drops it on any frame but
+            // Base Set.
             //
-            // Stored axes are on the LEFT, so `+` keeps them: whatever the card lab saved wins,
-            // and the derived value only fills the gap. Seeding on the left would quietly undo an
-            // admin's choice on the next regenerate.
-            //
-            // The freshly rolled axes are the exception, and sit LEFT of the stored ones on purpose:
-            // "Regenerate" has to hand back a visibly different card, which it cannot do if last
-            // run's frame and type always win. An empty roll (options not loaded yet, or a client
-            // that sends nothing) leaves the saved card exactly as it was.
+            // Union order matters, and `+` keeps the leftmost: a fresh roll beats the stored axes
+            // so Regenerate hands back a visibly different card, and both beat the derived seed.
+            // An empty roll leaves the saved card exactly as it was.
             'axes' => (array) ($data['axes'] ?? [])
                 + (array) ($user->card['axes'] ?? [])
                 + ['firstEdition' => (int) ($profile['age_years'] ?? 0) >= self::FIRST_EDITION_YEARS],
@@ -173,10 +161,10 @@ class DashboardController extends Controller
             ->withProperties(['slug' => $user->slug, 'login' => $login])
             ->log('Regenerated card');
 
-        // The stats and the type did refresh either way, so this is a warning, not a failure -
-        // it just reuses the error box rather than growing a third flash channel for one line.
+        // The stats and the type refreshed either way, so this is a warning rather than a failure.
+        // It reuses the error box instead of adding a third flash channel for one line.
         return $loreFailed
-            ? back()->withErrors(['card' => 'Card refreshed, but the AI never answered - the previous flavour text was kept.'])
+            ? back()->withErrors(['card' => 'Card refreshed, but the AI never answered, so the previous flavour text was kept.'])
             : back()->with('success', 'Your card was regenerated.');
     }
 }

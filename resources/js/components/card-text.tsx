@@ -41,9 +41,9 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
 }
 
 /**
- * The card's prose, straight from the row that renders it. Every limit here matches the server's
- * validation AND the printed box on the frame - these are fixed-size plates, so an over-long
- * string overflows the art instead of wrapping.
+ * The card's prose, straight from the row that renders it. Every limit here matches both the
+ * server's validation and the printed box on the frame: these are fixed-size plates, so an
+ * over-long string overflows the art rather than wrapping.
  */
 export function CardText({ text, onChange, showWhy }: { text: CardText; onChange: (next: CardText) => void; showWhy: boolean }) {
     const set = (patch: Partial<CardText>) => onChange({ ...text, ...patch });

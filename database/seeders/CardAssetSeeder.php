@@ -83,12 +83,11 @@ class CardAssetSeeder extends Seeder
         }
 
         // --- glare / foil finishes (drive the holo engine via data-rarity) ---
-        // EVERY foil recipe public/holo.css actually defines, so the Glare picker can
-        // reach all of them. Each `dr` below was cross-checked against a [data-rarity]
-        // selector in holo.css -- a dr with no matching selector silently renders no
-        // foil at all, so do not invent values here.
-        // Omitted on purpose: `ball holo`, which is not a finish of its own but the
-        // shared suffix matcher that pokeball/masterball holo both end with.
+        // Every foil recipe public/holo.css defines, so the glare picker can reach all of them.
+        // Each `dr` must match a [data-rarity] selector in holo.css: one without a selector
+        // silently renders no foil, so do not invent values here.
+        // `ball holo` is omitted on purpose. It is not a finish of its own, but the shared suffix
+        // that pokeball and masterball holo both end with.
         $glare = [
             ['none', 'None', ''],
             // -- SwSh --

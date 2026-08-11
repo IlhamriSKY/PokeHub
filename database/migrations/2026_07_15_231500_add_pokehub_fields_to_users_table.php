@@ -5,11 +5,13 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
 /**
- * Public-profile + Google-login fields on users.
- *  - slug: the public URL (pokehub.dev/{slug}); admin can rename it
- *  - card: the hand-authored custom card (Profile-shaped JSON + rarity + overrides)
+ * Public-profile and social sign-in fields on users.
+ *
+ *  - slug: the public URL, /{slug}, which an admin can rename
+ *  - card: the stored card (profile JSON plus rarity and axes)
  *  - is_public: whether the slug page is live
- *  - google_id / avatar: Socialite sign-in
+ *  - google_id / avatar: Socialite sign-in. `google_id` is unused since sign-in became
+ *    GitHub-only; the column is kept so this migration stays reversible.
  */
 return new class extends Migration
 {

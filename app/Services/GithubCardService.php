@@ -3,17 +3,14 @@
 namespace App\Services;
 
 use App\Models\CardAsset;
+use App\Models\Profile;
 use Illuminate\Support\Facades\Http;
 use Throwable;
 
 /**
- * PokeHub card generation: fetch a public GitHub profile + repos, shape a compact payload, ask an
- * OpenAI-compatible endpoint for the Pokedex flavor and TCG attacks, and score the profile into a
- * rarity.
- *
- * Originally a behaviour-for-behaviour port of api/github.php. The text clamps still match it, but
- * `clampDamage` and `rarityFor` deliberately do not: the first printed abbreviated star counts as
- * attack damage, and the second handed every unlisted developer a Common.
+ * Builds a card from a GitHub profile: fetch the user and their repos, shape a compact payload,
+ * ask an OpenAI-compatible endpoint for the Pokedex flavour and attacks, then score the profile
+ * into a rarity.
  */
 class GithubCardService
 {
@@ -22,6 +19,60 @@ class GithubCardService
     public function __construct()
     {
         $this->cfg = config('pokehub');
+    }
+
+    /**
+     * The cached card for a login, generated once if there is none yet.
+     *
+     * An existing row is returned untouched. This is a public path, so a repeat search must not
+     * cost another GitHub round trip and another AI completion; refreshing a card is the owner's
+     * regenerate button, behind the daily quota.
+     *
+     * @return array{0: ?Profile, 1: ?string, 2: int} [row, errorMessage, status]
+     */
+    public function ensureProfile(string $login): array
+    {
+        $login = strtolower($login);
+
+        $row = Profile::find($login);
+        // split() rather than github_json, so a legacy payload-only row still counts as a hit.
+        [$github] = $row?->split() ?? [null];
+        if (is_array($github) && ! empty($github['login'])) {
+            return [$row, null, 200];
+        }
+
+        [$user, $err, $code] = $this->ghGet('https://api.github.com/users/'.rawurlencode($login));
+        if ($err !== null || ! is_array($user)) {
+            return match (true) {
+                $code === 404 => [null, 'No GitHub account called @'.$login.'.', 404],
+                $code === 403 || $code === 429 => [null, 'GitHub is rate-limiting us right now. Try again in a minute.', 429],
+                default => [null, 'GitHub is unreachable right now. Try again in a minute.', 502],
+            };
+        }
+
+        // A repo failure is not fatal: followers, age and bio still make a card.
+        [$repos] = $this->ghGet('https://api.github.com/users/'.rawurlencode($login).'/repos?per_page=100&sort=pushed');
+        $profile = $this->buildProfile($user, is_array($repos) ? $repos : []);
+
+        $lore = null;
+        $ai = $this->cfg['ai'] ?? [];
+        if (! empty($ai['enabled']) && ! empty($ai['key'])) {
+            $profile['readme'] = $this->fetchReadme($login);
+            $profile['orgs'] = $this->fetchOrgs($login);
+            // Null when the model times out. The stats card still renders, and the owner can
+            // regenerate the flavour once they claim the handle.
+            $lore = $this->aiGenerate($profile);
+            unset($profile['readme'], $profile['orgs']); // AI inputs only; keep github_json compact
+        }
+
+        return [
+            Profile::updateOrCreate(
+                ['login' => $login],
+                ['github_json' => $profile, 'card_json' => ['ai' => $lore], 'fetched_at' => time()]
+            ),
+            null,
+            201,
+        ];
     }
 
     /** Fetch a GitHub API URL. Returns [decodedBodyOrNull, errorStringOrNull, httpCode]. */
@@ -161,12 +212,12 @@ class GithubCardService
             .'a little dramatic, never generic). Reply with ONLY a JSON object (no markdown, no commentary, no '
             .'reasoning) of exactly this shape: '
             .'{"species":"a short species-class title from their tech ONLY (no person name), e.g. Kernel Coder or Rust Ranger, MAX 22 chars",'
-            // TWO separate texts, because the two card faces give them very different room.
-            // flavor -> the Pokemon face's printed flavour box (~2 short lines). MUST stay short
-            // or it spills out of the box drawn on the frame art.
+            // Two texts, because the two faces have very different room. flavor fills the Pokemon
+            // face's printed box (~2 short lines) and must stay short or it spills out of the
+            // frame art.
             .'"flavor":"one COMPLETE Pokedex-style sentence about this dev, ending in a period, up to 100 chars",'
-            // effect -> the Trainer face, which has NO attacks, so this is its only prose and it
-            // fills a whole plate. Longer on purpose; never shown on a Pokemon card.
+            // effect fills a whole plate on the Trainer face, which has no attacks to share it
+            // with. Never shown on a Pokemon card.
             .'"effect":"Trainer-card rules text about this dev, 2 sentences of 150 to 190 characters total, '
             .'written like real TCG Trainer effect text, ALWAYS ending in a period and fully finishing the thought '
             .'(never end on a dangling word, number, or preposition like your/the/a/of/into), weaving in a real '
@@ -181,18 +232,13 @@ class GithubCardService
                 ['role' => 'user', 'content' => json_encode($facts, JSON_UNESCAPED_UNICODE)],
             ],
             'temperature' => 0.85,
-            // The card JSON itself is ~200 tokens, but a reasoning model bills its hidden thinking
-            // against this same ceiling, and this prompt's character-count rules make it ruminate
-            // for thousands: with thinking left on, deepseek-v4-flash wants ~6.6k before writing a
-            // word, so the old 800 returned finish_reason=length with EMPTY content on every single
-            // call - which is why regenerating silently kept the previous lore forever. The headroom
-            // is the safety net for an endpoint that ignores the two switches below; unused ceiling
-            // costs nothing.
+            // The card JSON is ~200 tokens, but a reasoning model bills its hidden thinking against
+            // this same ceiling and the character-count rules above make it ruminate for thousands.
+            // Headroom for an endpoint that ignores the two switches below; unused ceiling is free.
             'max_tokens' => 8000,
             'stream' => false,
-            // Two dialects of "do not think", because neither endpoint understands the other's:
-            // reasoning_effort is OpenAI/DeepSeek, chat_template_kwargs is Qwen/vLLM. With thinking
-            // off the same request answers in ~200 tokens instead of ~6800.
+            // Two dialects of "do not think", since neither endpoint understands the other's:
+            // reasoning_effort is OpenAI/DeepSeek, chat_template_kwargs is Qwen/vLLM.
             'reasoning_effort' => 'none',
             'chat_template_kwargs' => ['enable_thinking' => false],
         ];
@@ -245,20 +291,17 @@ class GithubCardService
 
         return [
             'species' => mb_substr(trim((string) ($lore['species'] ?? '')), 0, 22),
-            // Two budgets, because the two faces have different room. Each clamp sits a little
-            // ABOVE its prompt limit so a slightly-over response is still cut on a SENTENCE
-            // boundary by clampText rather than mid-word.
-            // flavor: Pokemon flavour box, ~2 short lines (prompt 100).
+            // Each budget sits a little above its prompt limit, so a slightly over-long response is
+            // still cut on a sentence boundary rather than mid-word.
             'flavor' => $this->clampText((string) $lore['flavor'], 110),
-            // effect: Trainer plate, no attacks to share with (prompt 150-190). Falls back to
-            // the flavor if the model omits it, so an old cached row still renders.
+            // Falls back to the flavour when the model omits it, so older rows still render.
             'effect' => $this->clampText((string) ($lore['effect'] ?? $lore['flavor']), 210),
             'attacks' => array_slice($attacks, 0, 2),
             'ai' => true,
         ];
     }
 
-    /** Trim to at most $max chars on a sentence boundary (verbatim from api/github.php). */
+    /** Trim to at most $max characters, preferring a sentence boundary. */
     public function clampText(string $s, int $max): string
     {
         $s = trim((string) preg_replace('/\s+/', ' ', $s));
@@ -284,12 +327,9 @@ class GithubCardService
     }
 
     /**
-     * Make an attack's damage a number a card could actually print: a multiple of 10, 10..300,
-     * keeping any real TCG suffix ("30+", "50x").
-     *
-     * This used to abbreviate instead of clamp - a model that answered with the user's star count
-     * got "252k" printed as damage, which fits the 5-character slot but is not a damage value.
-     * An empty string is left alone; plenty of real attacks do no damage.
+     * Make an attack's damage a number a card could actually print: a multiple of 10 between 10
+     * and 300, keeping any real TCG suffix ("30+", "50x"). An empty string is left alone, since
+     * plenty of real attacks do no damage.
      */
     public function clampDamage(string $s): string
     {
@@ -307,10 +347,9 @@ class GithubCardService
     }
 
     /**
-     * How notable this developer is, on a log scale. Followers is the primary signal and stars
-     * the secondary, because both are heavy-tailed the way card rarity is: an order of magnitude
-     * more followers should be one step rarer, not ten times rarer. Repos and account age are
-     * small nudges - a prolific or long-standing account edges up a tier, but cannot carry one.
+     * How notable this developer is, on a log scale. Followers lead and stars follow, since both
+     * are heavy-tailed the way rarity is: an order of magnitude more followers is one step rarer,
+     * not ten times rarer. Repo count and account age only nudge.
      *
      *   ~5 followers, 3 stars, 20 repos, 3y   ->  1.7   (common)
      *   100 / 200 / 40 / 6y                   ->  4.1   (uncommon)
@@ -328,9 +367,8 @@ class GithubCardService
     }
 
     /**
-     * Score -> tier. The thresholds are set so the distribution comes out as a real set's
-     * pyramid - most developers Common, a handful Ultra - rather than an even split. A card's
-     * rarity is meant to say "this one is hard to pull", which only works if it usually isn't.
+     * Score to tier. The thresholds aim for a real set's pyramid, most developers Common and a
+     * handful Ultra, rather than an even split.
      */
     public function rarityTier(float $score): string
     {
@@ -345,15 +383,11 @@ class GithubCardService
     /**
      * Rarity for a login.
      *
-     * Was `rarity_map[$login] ?? default`, which meant every developer not on a hand-written list
-     * of five got Common - rarity was not derived from anything at all.
+     * The tier is earned from the profile, while which preset inside that tier is a stable hash of
+     * the login, so two developers with near-identical stats still pull different foils. crc32
+     * rather than rand(), because a login must render the same card every time.
      *
-     * Now: the TIER is earned from the profile (above), and WHICH preset inside that tier is a
-     * stable hash of the login. That split is deliberate - the tier has to be merit, or rarity
-     * means nothing, but two developers with near-identical stats should still pull different
-     * foils. crc32, not rand(): the same login must produce the same card on every render.
-     *
-     * An entry in `rarity_map` still wins outright; that list is the editorial override for the
+     * An entry in `rarity_map` wins outright; that list is the editorial override for the
      * landing-page showcase.
      */
     public function rarityFor(string $login, array $profile = []): string
@@ -373,11 +407,8 @@ class GithubCardService
     /**
      * Enabled presets grouped by tier, from the admin-managed table.
      *
-     * Read live. This was cached for an hour and nothing invalidated it, so for an hour after an
-     * admin disabled a preset the roll still handed it out and WROTE it to the user's card - where
-     * the browser, building its list from the same table, could no longer find it and silently
-     * printed a Common. The saving was one indexed read of a handful of rows, on a path that also
-     * makes two GitHub calls and waits up to 120s on the AI.
+     * Read live rather than cached: a stale list hands out presets the browser can no longer
+     * resolve, and this is one indexed read on a path that already waits on GitHub and the AI.
      */
     private function presetsByTier(): array
     {
@@ -390,9 +421,8 @@ class GithubCardService
     }
 
     /**
-     * Pick one preset from a tier, deterministically. Degrades DOWNWARD if a tier is empty:
-     * `rarity_preset` rows are admin-managed, and disabling every Ultra preset should hand out
-     * Rares, never upgrade a Common or blow up mid-render.
+     * Pick one preset from a tier, deterministically. Falls back downward when a tier is empty, so
+     * disabling every Ultra preset hands out Rares rather than upgrading a Common.
      */
     private function pickInTier(string $tier, string $login): ?string
     {

@@ -96,10 +96,10 @@ class SecurityHardeningTest extends TestCase
         $this->assertTrue($throttled('public.card.image'), 'card image capture route lost its throttle');
 
         $options = collect(Route::getRoutes()->getRoutes())
-            ->first(fn ($r) => $r->uri() === 'api/options.php');
+            ->first(fn ($r) => $r->uri() === 'api/options');
         $this->assertTrue(
             collect($options->gatherMiddleware())->contains(fn ($m) => is_string($m) && str_starts_with($m, 'throttle:')),
-            'api/options.php lost its throttle'
+            'api/options lost its throttle'
         );
     }
 
@@ -119,9 +119,9 @@ class SecurityHardeningTest extends TestCase
     }
 
     /**
-     * The captcha, actually running. `['nullable', new TurnstileRule]` reads like a guard and type
-     * checks, but Laravel skips a non-implicit rule object when the field is absent - so simply
-     * OMITTING the token was the bypass, while the operator's toggle still read as on.
+     * The captcha has to run on an absent field, not just an invalid one. Laravel skips a
+     * non-implicit rule object when the field is missing, which would make omitting the token a
+     * complete bypass while the operator's toggle still reads as on.
      */
     public function test_a_missing_captcha_token_is_rejected_when_turnstile_is_on()
     {
@@ -157,8 +157,8 @@ class SecurityHardeningTest extends TestCase
 
     /**
      * The cache key is the whole card, so anything printed on it invalidates the image. A
-     * hand-picked subset missed the name, stars, repos and top language - and no writer of those
-     * calls forget(), so the README kept serving a card that no longer existed.
+     * hand-picked subset would miss fields whose writers never call forget(), leaving the README
+     * serving a card that no longer exists.
      */
     public function test_the_capture_key_follows_every_printed_field()
     {
@@ -189,7 +189,7 @@ class SecurityHardeningTest extends TestCase
     /** The public options endpoint must not run a seeder; an empty table is just an empty list. */
     public function test_the_public_options_endpoint_does_not_seed_the_database()
     {
-        $this->getJson('/api/options.php')->assertOk()->assertExactJson([]);
+        $this->getJson('/api/options')->assertOk()->assertExactJson([]);
 
         $this->assertSame(0, CardAsset::count());
     }

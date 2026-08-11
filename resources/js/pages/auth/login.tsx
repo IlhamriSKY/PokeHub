@@ -30,9 +30,7 @@ export default function Login({ status }: LoginProps) {
                     Continue with GitHub
                 </a>
 
-                <p className="text-muted-foreground text-center text-xs">
-                    New here? Signing in creates your account. We never ask for repository access.
-                </p>
+                <p className="text-muted-foreground text-center text-xs">New here? Signing in creates your account.</p>
             </div>
 
             {status && <div className="mt-4 text-center text-sm font-medium text-green-600">{status}</div>}

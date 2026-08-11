@@ -74,11 +74,8 @@ export function PokeCard({
     // Per-profile, not per-element: the amounts are era constants, so the TYPES are the only place
     // the bottom row can tell two cards apart. See matchOf.
     const match = matchOf(type as Element, d);
-    // Retreat cost reads as bulk, so it comes off public repo count - the profile signal with
-    // actual spread. It used to be `Math.min(3, Math.max(1, langs.length))`, which could only
-    // ever return 3: the API stores a TOP-THREE language list, so across the whole profile table
-    // every row has 0, 1 or 3 langs and never more. That made retreat a constant dressed up as a
-    // formula, and every card on the site printed the same three energies.
+    // Retreat cost reads as bulk, so it comes off the public repo count: the profile signal with
+    // real spread. Language count cannot drive it, since the stored list is capped at three.
     const retreat = d.repos >= 200 ? 4 : d.repos >= 75 ? 3 : d.repos >= 25 ? 2 : 1;
 
     // subtype -> visible stage label + a form suffix on the name.

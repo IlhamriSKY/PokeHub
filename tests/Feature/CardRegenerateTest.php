@@ -10,9 +10,11 @@ use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
 /**
- * Regenerate has one job: hand back a card that is actually different. It stopped doing that
- * silently - the AI answered nothing and the controller kept the old lore - so the two things
- * worth pinning are that a re-rolled element sticks, and that it cannot be anything it likes.
+ * Regenerate has one job: hand back a card that is actually different.
+ *
+ * The two things worth pinning are that a re-rolled axis sticks, and that a client cannot roll
+ * anything it likes. A silent failure matters as much as a wrong one, so the case where the AI
+ * answers nothing has to report itself rather than look like a success.
  */
 class CardRegenerateTest extends TestCase
 {
@@ -66,7 +68,7 @@ class CardRegenerateTest extends TestCase
 
     public function test_a_client_cannot_claim_the_first_edition_stamp()
     {
-        $this->fakeGithub(); // the faked account was created in 2020, well short of a decade
+        $this->fakeGithub(); // The faked account is well short of the ten years the stamp needs.
 
         $user = User::factory()->create(['github_login' => 'dev']);
 
@@ -85,7 +87,7 @@ class CardRegenerateTest extends TestCase
 
         $this->actingAs($user)->post('/dashboard/card/regenerate')->assertSessionHasErrors('card');
 
-        // The old lore is still there - that part was always right, it just never said so.
+        // The previous lore is kept rather than wiped.
         $this->assertSame('old lore', $user->fresh()->card['profile']['ai']['flavor']);
     }
 

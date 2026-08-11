@@ -85,8 +85,7 @@ class CardLabTest extends TestCase
 
     /**
      * A cleared caption stays cleared. ConvertEmptyStringsToNull turns the emptied field into
-     * null, and `$text['why'] ?? $row->why` then put the old caption straight back - the panel
-     * flashed "saved" while the homepage kept printing what the admin had just deleted.
+     * null, which a `??` fallback would read as "not sent" and restore.
      */
     public function test_clearing_a_showcase_caption_removes_it()
     {

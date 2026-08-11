@@ -20,9 +20,10 @@ class ShowcaseCard extends Model
 
     /**
      * The `{profile, rarity, axes}` blob both the landing page and the public card page render.
-     * Shared so those two cannot drift into showing the same card differently.
+     * Shared, so the two cannot show the same card differently.
      *
-     * Returns null for a stub profile row - better to skip a card than render an empty one.
+     * Null when the profile row is a stub, so the caller can skip the card rather than render it
+     * empty.
      */
     public function cardPayload(?Profile $profile): ?array
     {

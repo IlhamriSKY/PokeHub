@@ -169,15 +169,12 @@ export function raritiesFromOptions(options: Record<string, OptionRow[]>): Rarit
 }
 
 /**
- * The rarity a card renders with -- ALWAYS a real Rarity, never undefined.
+ * The rarity a card renders with. Always a real Rarity, never undefined.
  *
- * Every consumer dereferences it unconditionally (`activeRarity.tier` in cardModel's
- * resolveOverrides, `rarity.dr`/`rarity.tier`/`rarity.sup` in PokeCard), so handing back
- * undefined white-screens the page. Callers used to write `map[key] ?? map.common` inline,
- * which assumed a `common` preset always exists -- but `rarity_preset` rows are admin-managed
- * and /api/options.php only serves ENABLED ones, so one click on "Disable" (or "Delete") for
- * rarity_preset/common took down every public card AND the dashboard editor at once, with no
- * way back: OptionsController only re-seeds when the table is COMPLETELY empty.
+ * Every consumer dereferences it unconditionally, so returning undefined white-screens the page.
+ * An inline `map[key] ?? map.common` is not enough either: `rarity_preset` rows are admin-managed
+ * and /api/options serves only enabled ones, so disabling the `common` preset would take down
+ * every public card at once.
  *
  * The chain degrades instead: asked-for key -> DB `common` -> any surviving preset -> the
  * built-in `common`. The built-in floor is deliberate; a preset row being disabled is an
@@ -264,29 +261,22 @@ export const resistanceAmount = () => '−30';
 /**
  * Does this era's card print a Resistance at all?
  *
- * Only Base Set does. TCG Pocket never had the stat, and Scarlet & Violet dropped it from the
- * layout - a real SV card shows Weakness and Retreat and nothing between them. Both of those
- * frames still bake the empty cell, which is why the row stays three columns wide and simply
- * leaves the middle blank rather than closing the gap up.
+ * Only Base Set does. TCG Pocket never had the stat, and Scarlet & Violet dropped it: a real SV
+ * card shows Weakness and Retreat with nothing between them. Both frames still bake the empty
+ * cell, so the row stays three columns wide and leaves the middle blank.
  *
- * Enforced here rather than by hiding the cell in CSS: `matchOf` happily derives a resistance type
- * from the profile's second language on every generation, so without this an SV card printed a
- * resistance the era does not have the moment that language stopped colliding with the other two.
+ * Enforced here rather than by hiding the cell in CSS, because `matchOf` derives a resistance type
+ * from the profile's second language on every generation.
  */
 export const hasResistance = (gen: Generation) => gen === '1-gen';
 
 /**
- * HP as a card actually prints it: a multiple of 10, floor 30, ceiling 340 (VMAX territory).
- * Still the follower count - just mapped onto the range real cards use. The raw number is not
- * lost, it moved to the dex line.
+ * HP as a card actually prints it: a multiple of 10, floor 30, ceiling 340. Still the follower
+ * count, mapped onto the range real cards use; the raw number moves to the dex line.
  *
- * The card used to print followers verbatim, so Linus arrived at "312k HP", a number no Pokémon
- * card has ever carried.
- *
- * 50 HP per order of magnitude, not 44. Quantising to 10 leaves only 32 legal values for the whole
- * of GitHub, so a shallow curve collides: at 44/decade Guido (27k followers) and Theo (19k) both
- * landed on 220 despite a 39% gap, because they sat 6 HP apart and rounded together. 50 separates
- * them, and 1M followers still reaches only 330 - the 340 clamp stays out of reach in practice.
+ * 50 HP per order of magnitude rather than 44. Quantising to 10 leaves only 32 legal values for
+ * the whole of GitHub, and a shallower curve rounds accounts an order of magnitude apart onto the
+ * same value. At 50, a million followers still reaches only 330, so the clamp stays out of reach.
  *   0 -> 30    100 -> 130    10k -> 230    91k -> 280    312k -> 300
  */
 export const cardHp = (d: Profile) => {
@@ -296,7 +286,7 @@ export const cardHp = (d: Profile) => {
 
 /**
  * Attack damage as a card prints it: a multiple of 10, 10..300. Same log shape as HP, so a big
- * number still reads as big without printing "252k", which the fallback attacks used to do.
+ * number still reads as big without printing a raw star count.
  */
 export const attackDamage = (n: number, per = 34) =>
     String(Math.min(300, Math.max(10, Math.round((10 + per * Math.log10(Math.max(0, n) + 1)) / 10) * 10)));

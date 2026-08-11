@@ -50,9 +50,9 @@ class ShowcaseCardSeeder extends Seeder
             'rarity' => 'rainbow',
             'gen' => 'tcg-gen',
             'mark' => 's2',
-            // His second language is JavaScript. Stored as the resolved element rather than looked
-            // up from a language map: a seed is a one-time editorial choice, and the PHP copy of
-            // langType() this used to carry had already drifted from the TypeScript original.
+            // His second language is JavaScript. Stored as the resolved element rather than a
+            // language name, since a seed is a one-time editorial choice and a PHP copy of
+            // langType() would only drift from the TypeScript original.
             'dual' => 'lightning',
         ],
         [

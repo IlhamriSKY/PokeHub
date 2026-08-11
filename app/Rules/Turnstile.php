@@ -8,15 +8,15 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Request;
 
 /**
- * Cloudflare Turnstile server-side verification. No-op unless
- * services.turnstile.enabled is true, so local dev works without keys.
+ * Cloudflare Turnstile server-side verification. A no-op unless services.turnstile.enabled is
+ * true, so local development works without keys.
  */
 class Turnstile implements ValidationRule
 {
     /**
-     * Run even when the field is absent, empty or null - Laravel skips a non-implicit rule object
-     * in all three cases, so the `if (! $value)` branch below was unreachable and OMITTING the
-     * token passed validation outright. That is the whole captcha, off, while the toggle reads on.
+     * Implicit, so the rule still runs when the field is absent, empty or null. Laravel skips a
+     * non-implicit rule object in all three cases, which would let a request omit the token and
+     * pass validation with the captcha switched on.
      */
     public bool $implicit = true;
 

@@ -1,22 +1,19 @@
 /**
- * Screenshot the REAL card and write it as an animated GIF or a still SVG, so both are the
- * browser's own render rather than a redrawing of it. That is the only way to get holo.css onto a
- * static image: the foil is layered blend modes following `--pointer-x/y`, so the shots are taken
- * while driving a mouse across the card.
+ * Screenshot the real card page and write it as an animated GIF or a still image, so every format
+ * is the browser's own render rather than a redrawing of it. That is the only way to get holo.css
+ * onto a static image: the foil is layered blend modes following `--pointer-x/y`, so the shots are
+ * taken while driving a pointer across the card.
  *
  *   node scripts/capture-card.mjs <url> <out.gif|out.svg|out.png> [frames] [width] [delayMs]
  *
- * The format comes from the output extension. `svg` takes ONE shot and wraps the PNG - it exists so
- * the still and the animation cannot disagree; a hand-drawn SVG was tried and drifted from the card
- * twice (font metrics, then the weakness chart).
+ * The format comes from the output extension. `svg` takes one shot and wraps the PNG, so the still
+ * and the animation cannot disagree.
  *
- * Encoding happens HERE, not in PHP. Imagick was the obvious home for it, but this project's
- * ImageMagick cannot load its own PNG coder ("UnableToLoadModule IM_MOD_RL_PNG_.dll"), and the
- * shots are already in this process - pngjs decodes and gifenc writes, both pure JS, so the
- * pipeline has no native-library dependency at all.
+ * Encoding happens here rather than in PHP: the shots are already in this process, and pngjs and
+ * gifenc are pure JS, so the pipeline needs no native image library.
  */
 import { writeFileSync } from 'node:fs';
-// Both are CommonJS, so they come in as default exports - named imports throw at parse time.
+// Both are CommonJS, so they arrive as default exports; named imports throw at parse time.
 import gifenc from 'gifenc';
 import pngjs from 'pngjs';
 import puppeteer from 'puppeteer';
@@ -28,9 +25,9 @@ const [url, out, framesArg, widthArg, delayArg] = process.argv.slice(2);
 const WIDTH = Number(widthArg) || 320;
 const DELAY = Number(delayArg) || 90;
 const IS_SVG = /\.svg$/i.test(out ?? '');
-// PNG is the SVG's own still, unwrapped: same single shot, same downscale, just written straight
-// out instead of base64'd into an <svg>. It exists for link previews - Open Graph scrapers reject
-// SVG outright and only some of them animate a GIF, so a share card needs a plain raster.
+// PNG is the SVG's own still, unwrapped: the same single shot and downscale, written straight out
+// instead of base64'd into an <svg>. It exists for link previews, where Open Graph scrapers reject
+// SVG and only some of them animate a GIF.
 const IS_PNG = /\.png$/i.test(out ?? '');
 const STILL = IS_SVG || IS_PNG;
 const FRAMES = STILL ? 1 : Number(framesArg) || 24;
@@ -40,7 +37,7 @@ if (!url || !out) {
     process.exit(2);
 }
 
-/** Shots live in memory - nothing touches disk until the finished file is written. */
+/** Shots live in memory; nothing touches disk until the finished file is written. */
 const shots = [];
 
 const browser = await puppeteer.launch({
@@ -57,21 +54,20 @@ try {
     await page.goto(url, { waitUntil: 'networkidle2', timeout: 45000 });
     await page.waitForSelector('.card .pcg', { timeout: 20000 });
     /*
-     * `.card .pcg` exists on the FIRST render, before /api/options.php has answered - and that
-     * fetch can resolve after `goto`'s networkidle2, with the frame, foil, badge and rarity mark
-     * only arriving on the re-render it triggers. Waiting for the network to go quiet AGAIN covers
-     * both the options request and the WebPs it pulls in; a fixed sleep instead either truncated
-     * that (a plain option-less card, then cached to disk under a key that never changes) or
-     * padded every capture. Then decode: images can be loaded but not yet painted.
+     * `.card .pcg` exists on the first render, before /api/options has answered, and that fetch
+     * can resolve after `goto`'s networkidle2: the frame, foil, badge and rarity mark only arrive
+     * on the re-render it triggers. Waiting for the network to go quiet again covers both the
+     * options request and the images it pulls in, where a fixed sleep would either truncate that
+     * or pad every capture. The decode pass then waits for images that are loaded but not painted.
      */
     await page.waitForNetworkIdle({ idleTime: 500, timeout: 15000 }).catch(() => {});
     await page.evaluate(() => Promise.all([...document.images].filter((i) => !i.complete).map((i) => i.decode().catch(() => {}))));
     await new Promise((r) => setTimeout(r, 200));
 
     // Strip the page down to the card. The clip is wider than the card (see `pad`), so without
-    // this the surrounding page - the stats column, the buttons - bled into the edges of every
-    // shot. Hidden rather than removed: the card's own ancestors have to stay visible, and the
-    // pointer-tilt listeners are bound to nodes that must not move.
+    // this the surrounding page bleeds into the edges of every shot. Hidden rather than removed,
+    // because the card's ancestors have to stay visible and the pointer-tilt listeners are bound
+    // to nodes that must not move.
     await page.evaluate(() => {
         const card = document.querySelector('.card');
         const ancestors = [];
@@ -82,13 +78,12 @@ try {
             if (!keep.has(el) && !card.contains(el)) el.style.visibility = 'hidden';
         });
 
-        // Transparent, not a baked mat, so one file is correct on a light or a dark README.
+        // Transparent rather than a baked mat, so one file is correct on a light or a dark README.
         //
-        // Every ANCESTOR has to be cleared too, not just html/body. `visibility: hidden` cannot be
-        // used on them (that would hide the card with them), so an ancestor carrying `bg-background`
-        // kept painting the page's dark colour straight through `omitBackground` - the still came
-        // out with an opaque near-black surround. The card itself is skipped: its own layers are
-        // where the frame art lives.
+        // Every ancestor has to be cleared, not just html and body: `visibility: hidden` would
+        // hide the card along with them, so an ancestor carrying a background paints straight
+        // through `omitBackground`. The card itself is skipped, since its own layers carry the
+        // frame art.
         for (const el of ancestors) {
             if (el !== card) el.style.background = 'transparent';
         }
@@ -96,12 +91,12 @@ try {
 
     const card = await page.$('.card');
     const box = await card.boundingBox();
-    // A FIXED clip for every shot: the pointer tilt rotates the card in 3D, so its own bounding box
-    // grows and shrinks as it moves, and per-element screenshots would jitter frame to frame.
+    // One fixed clip for every shot: the pointer tilt rotates the card in 3D, so its own bounding
+    // box grows and shrinks as it moves and per-element screenshots would jitter frame to frame.
     //
-    // The padding is 9% of the card's width, not a flat 10px. The box is measured at REST, but the
-    // tilt swings the corners well outside it - at 10px the top edge was being sliced off on the
-    // frames where the card leans back. Scaling with the card keeps that true at any render size.
+    // The padding is a share of the card's width rather than a flat pixel count. The box is
+    // measured at rest, but the tilt swings the corners outside it, and scaling with the card
+    // keeps the margin sufficient at any render size.
     const pad = Math.ceil(box.width * 0.09);
     const clip = {
         x: Math.max(0, Math.round(box.x - pad)),
@@ -114,14 +109,14 @@ try {
     // scanner; this reads like a card being turned over in someone's hand, and it loops seamlessly
     // because both axes complete whole cycles.
     //
-    // Amplitude 0.30, not 0.42: smoothness is per-frame DELTA, not frame count alone. Slowing the
-    // loop down (90ms) would make a wide path look MORE stepped, because each jump then sits on
-    // screen longer - so the path tightens as the timing relaxes.
+    // Smoothness is a matter of per-frame delta rather than frame count alone, so the amplitude is
+    // kept modest: the slower the loop, the longer each step sits on screen, and a wide path would
+    // read as more stepped, not less. Amplitude and CardCapture's DELAY_MS move together.
     //
-    // The still takes its one shot a quarter-lap in, which is where the path crosses the card's
-    // centre: tilt lands on ~0deg, so a README embed has no perspective skew, but the pointer is
-    // ON the card, which is what lights the foil (`--card-opacity` 1; measured mean |delta| ~31/255
-    // against the untouched card). It is also exactly GIF frame 6, so the two cannot disagree.
+    // The still takes its one shot a quarter-lap in, where the path crosses the card's centre.
+    // Tilt lands near zero, so a README embed has no perspective skew, while the pointer is still
+    // on the card, which is what lights the foil. That point is also one of the GIF's own frames,
+    // so the two cannot disagree.
     for (let i = 0; i < FRAMES; i++) {
         const t = (STILL ? 0.25 : i / FRAMES) * Math.PI * 2;
         const px = box.x + box.width * (0.5 + 0.3 * Math.cos(t));
@@ -149,7 +144,7 @@ try {
     await browser.close();
 }
 
-/** The still as a bare PNG at output size - what svg() wraps, minus the wrapper. */
+/** The still as a bare PNG at output size: what svg() wraps, without the wrapper. */
 function png(shot, scale, w, h) {
     const src = PNG.sync.read(Buffer.from(shot));
     const flat = new PNG({ width: w, height: h });
@@ -177,10 +172,12 @@ function svg(shot, scale, w, h) {
 /** The animation: one shared palette, transparent surround, looping forever. */
 function gif(shotList, scale, w, h) {
     const enc = GIFEncoder();
-    // ONE palette for the whole animation, built from the middle frame. A per-frame palette makes
-    // the surround shimmer between frames, which on a mostly-static card is far more obvious than
-    // any loss from sharing.
-    // rgba4444, not rgb565: the palette has to carry an alpha entry for the transparent surround.
+    // One palette for the whole animation, built from the middle frame. A per-frame palette makes
+    // the surround shimmer between frames, which on a mostly static card is far more obvious than
+    // any loss from sharing one.
+    //
+    // rgba4444 rather than rgb565, since the palette needs an alpha entry for the transparent
+    // surround.
     const mid = downscale(PNG.sync.read(Buffer.from(shotList[Math.floor(shotList.length / 2)])), scale, w, h);
     const palette = quantize(mid, 256, { format: 'rgba4444' });
 

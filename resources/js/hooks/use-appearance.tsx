@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
 
 /**
- * Two themes only: light and dark. There is deliberately no "system" option — the OS preference is
- * not consulted at all, and dark is the default for a first-time visitor (the cards read best on a
- * dark ground). An explicit choice is remembered in localStorage.
+ * Two themes only: light and dark. There is no "system" option and the OS preference is never
+ * consulted; a first-time visitor gets dark, which is where the cards read best. An explicit
+ * choice is remembered in localStorage.
  */
 export type Appearance = 'light' | 'dark';
 

@@ -9,9 +9,11 @@ use Illuminate\Support\Facades\Cache;
 use Inertia\Inertia;
 
 /**
- * The showcase cards are served from ALREADY-CACHED profile rows and never fetched at render
- * time: a cold fetch is a GitHub call plus a ~120s AI call, which a marketing page may not do on
- * a visitor's request. A login with no warm row is skipped rather than rendered empty.
+ * The home page and its showcase.
+ *
+ * Showcase cards come from already-cached profile rows and are never fetched at render time: a
+ * cold fetch is a GitHub call plus an AI call, which the home page should not make a visitor wait
+ * for. A login with no cached row is skipped rather than rendered empty.
  */
 class LandingController extends Controller
 {
@@ -21,6 +23,10 @@ class LandingController extends Controller
     {
         return Inertia::render('landing', $this->props([
             'seo' => Seo::make([
+                'title' => config('app.name').' - any GitHub profile as a Pokemon card',
+                'description' => 'Look up any GitHub username and get a Pokemon-style trading card built from their public profile. '
+                    .'Followers become HP, stars become attack damage, the top language picks the element. No account needed.',
+                'imageAlt' => 'PokeHub - a GitHub profile rendered as a Pokemon-style trading card',
                 'canonical' => url('/'),
                 'jsonLd' => [
                     '@context' => 'https://schema.org',
@@ -34,11 +40,10 @@ class LandingController extends Controller
     }
 
     /**
-     * The landing page's own props, shared with the login route.
+     * The landing page's props, shared with the login route.
      *
-     * /login is this page with a sign-in panel over it rather than a separate destination, so it
-     * has to render the same component with the same showcase behind the panel. Going through the
-     * same cached query means opening the panel costs nothing extra.
+     * /login renders this same page with a sign-in panel over it, so it needs the same showcase
+     * behind the panel. Sharing the cached query means opening the panel costs nothing extra.
      *
      * @param  array<string, mixed>  $extra
      * @return array<string, mixed>
@@ -54,7 +59,7 @@ class LandingController extends Controller
 
             return $cards
                 ->map(function (ShowcaseCard $card) use ($rows) {
-                    // Null for a stub profile row: better three good cards than four with one broken.
+                    // Null when the profile row is a stub, so the card is dropped below.
                     $payload = $card->cardPayload($rows->get(strtolower($card->login)));
 
                     return $payload ? [
