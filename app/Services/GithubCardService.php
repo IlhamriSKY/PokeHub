@@ -16,6 +16,9 @@ class GithubCardService
 {
     private array $cfg;
 
+    /** Memoised presetsByTier(). Per-instance, so it never outlives the request. */
+    private ?array $byTier = null;
+
     public function __construct()
     {
         $this->cfg = config('pokehub');
@@ -425,15 +428,23 @@ class GithubCardService
      *
      * Read live rather than cached: a stale list hands out presets the browser can no longer
      * resolve, and this is one indexed read on a path that already waits on GitHub and the AI.
+     *
+     * Held for the lifetime of THIS service only, which is still live - an admin toggling a preset
+     * is a new request with a new instance. It matters because scoring a whole listing calls
+     * rarityFor() once per unscored row, and each of those re-ran this same query.
      */
     private function presetsByTier(): array
     {
+        if ($this->byTier !== null) {
+            return $this->byTier;
+        }
+
         $out = [];
         foreach (CardAsset::where('category', 'rarity_preset')->where('enabled', true)->orderBy('slug')->get(['slug', 'meta']) as $row) {
             $out[$row->meta['tier'] ?? 'common'][] = $row->slug;
         }
 
-        return $out;
+        return $this->byTier = $out;
     }
 
     /**

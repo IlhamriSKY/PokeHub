@@ -38,18 +38,24 @@ class GeneratedCards
         $claimed = User::whereNotNull('github_login')->pluck('github_login')->map(fn ($l) => strtolower((string) $l));
         $onShow = ShowcaseCard::pluck('login')->map(fn ($l) => strtolower((string) $l));
         $needle = mb_strtolower($search);
+        // Hoisted out of the map: app() hands back a NEW service per call for an unbound concrete
+        // class, so building it per row gave every rarityFor() its own uncached preset lookup.
+        $svc = app(GithubCardService::class);
 
         return Profile::query()
             ->orderByDesc('fetched_at')
             ->get()
             ->reject(fn (Profile $p) => $claimed->contains(strtolower($p->login)) || $onShow->contains(strtolower($p->login)))
-            ->map(function (Profile $p) {
+            ->map(function (Profile $p) use ($svc) {
                 [$github, $card] = $p->split();
                 if (! is_array($github) || empty($github['login'])) {
                     return null;
                 }
 
                 $name = ($github['name'] ?? '') !== '' ? $github['name'] : $github['login'];
+                // Once per row, not twice: the listing and the nested card payload want the same
+                // answer, and scoring it is a preset lookup rather than a field read.
+                $rarity = $card['rarity'] ?? $svc->rarityFor($github['login'], $github);
 
                 return [
                     'key' => 'profile:'.strtolower($p->login),
@@ -57,13 +63,13 @@ class GeneratedCards
                     'slug' => strtolower($github['login']),
                     'github_login' => $github['login'],
                     'avatar' => $github['avatar'] ?? null,
-                    'rarity' => $card['rarity'] ?? app(GithubCardService::class)->rarityFor($github['login'], $github),
+                    'rarity' => $rarity,
                     'followers' => isset($github['followers']) ? (int) $github['followers'] : null,
                     'stars' => isset($github['stars']) ? (int) $github['stars'] : null,
                     'fetched_at' => (int) $p->fetched_at,
                     'card' => [
                         'profile' => $github + ['ai' => $card['ai'] ?? null],
-                        'rarity' => $card['rarity'] ?? app(GithubCardService::class)->rarityFor($github['login'], $github),
+                        'rarity' => $rarity,
                         'axes' => (object) ($card['axes'] ?? []),
                     ],
                 ];
