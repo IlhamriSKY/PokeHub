@@ -452,3 +452,33 @@
 .pokehub-ball.is-still .pokehub-ball__btn {
     animation: none;
 }
+
+/* The two element washes behind a card page, drifting slowly so the background is never quite
+   still. Transform only: the opacity that keeps them ambient is a utility class on the element, so
+   a reduced-motion visitor is left with exactly that wash, held still. */
+@keyframes pokehub-ambient-top {
+    from {
+        transform: translate3d(-4%, -5%, 0) scale(1.05);
+    }
+    to {
+        transform: translate3d(4%, 3%, 0) scale(1.2);
+    }
+}
+@keyframes pokehub-ambient-bottom {
+    from {
+        transform: translate3d(4%, 4%, 0) scale(1.15);
+    }
+    to {
+        transform: translate3d(-4%, -3%, 0) scale(1.05);
+    }
+}
+@media (prefers-reduced-motion: no-preference) {
+    /* Different periods, and neither divides the other, so the pair never settles into a visible
+       beat the way two equal durations would. */
+    .pokehub-ambient-top {
+        animation: pokehub-ambient-top 19s ease-in-out infinite alternate;
+    }
+    .pokehub-ambient-bottom {
+        animation: pokehub-ambient-bottom 23s ease-in-out infinite alternate;
+    }
+}

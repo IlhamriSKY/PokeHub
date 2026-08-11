@@ -190,12 +190,18 @@ export default function PublicCard({ owner, card }: { owner: { name: string; slu
             <Head title={`${owner.name} - PokeHub`} />
 
             <div className="bg-background text-foreground relative min-h-screen overflow-hidden">
-                {/* The card's elements, top to bottom: primary above, secondary below. A single
-                    type gives both ends the same colour, so it reads as one flat wash. */}
+                {/* One wash at each end of the screen, carrying the card's elements: the primary
+                    above, the secondary below. A single type puts the same colour at both ends.
+                    Both drift slowly (card.css), so the page breathes rather than sitting flat. */}
                 <div
                     aria-hidden="true"
-                    className="pointer-events-none absolute inset-x-0 top-0 h-[420px] opacity-[0.14] blur-3xl"
-                    style={{ background: `linear-gradient(180deg, ${accent} 0%, ${accent2 ?? accent} 100%)` }}
+                    className="pokehub-ambient-top pointer-events-none absolute inset-x-0 top-0 h-[460px] opacity-[0.14] blur-3xl"
+                    style={{ background: `radial-gradient(75% 100% at 50% 0%, ${accent}, transparent)` }}
+                />
+                <div
+                    aria-hidden="true"
+                    className="pokehub-ambient-bottom pointer-events-none absolute inset-x-0 bottom-0 h-[460px] opacity-[0.14] blur-3xl"
+                    style={{ background: `radial-gradient(75% 100% at 50% 100%, ${accent2 ?? accent}, transparent)` }}
                 />
                 {/* The logo mark again, huge and faint, behind the card. */}
                 <AppLogoIcon
