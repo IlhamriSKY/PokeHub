@@ -159,6 +159,7 @@ export function usePointerTilt<T extends HTMLElement>(idle?: { index: number; co
          * listener regardless (deviceTilt.ts).
          */
         let onScreen = true;
+        let offTimer: ReturnType<typeof setTimeout> | undefined;
         let observer: IntersectionObserver | undefined;
         let unsubscribe: (() => void) | undefined;
 
@@ -166,15 +167,39 @@ export function usePointerTilt<T extends HTMLElement>(idle?: { index: number; co
             const onTilt = ({ x, y }: Tilt) => {
                 tiltedAt = Date.now();
                 if (!onScreen || Date.now() - touchedAt < TOUCH_HOLD_MS) return;
+                // The zoom overlay mounts a SECOND copy of the same card over the grid. Both are
+                // on screen, so both were painting a full holo stack every reading - twice the
+                // work, on the device least able to afford it. The enlarged one is the only one
+                // anyone can see.
+                if (!card.classList.contains('active') && document.querySelector('.card.active')) return;
                 queue(clamp(round(50 + x * 50)), clamp(round(50 + y * 50)));
             };
 
             observer = new IntersectionObserver(
                 ([entry]) => {
                     onScreen = entry.isIntersecting;
-                    // Hand the card back to its resting CSS on the way out, or it freezes mid-lean
-                    // at whatever angle it held when it left the screen.
-                    if (!onScreen) onLeave();
+                    if (offTimer) {
+                        clearTimeout(offTimer);
+                        offTimer = undefined;
+                    }
+                    if (onScreen) return;
+
+                    /*
+                     * Hand the card back to its resting CSS on the way out, or it freezes mid-lean
+                     * at whatever angle it held when it left the screen - but only once it has
+                     * STAYED out.
+                     *
+                     * This reset used to fire on the transition itself, which is what made the
+                     * foil flicker on a phone. onLeave() clears all ten custom properties, and
+                     * anything that reflows the page under a live sensor - opening the zoom
+                     * overlay locks body scroll, which is why /cards was the worst of it - can
+                     * flip intersection back and forth. Each flip wiped the properties and the
+                     * next reading, a frame later, painted them again.
+                     */
+                    offTimer = setTimeout(() => {
+                        offTimer = undefined;
+                        if (!onScreen) onLeave();
+                    }, 250);
                 },
                 { rootMargin: '10%' },
             );
@@ -266,6 +291,7 @@ export function usePointerTilt<T extends HTMLElement>(idle?: { index: number; co
             if (onEnter) rotator.removeEventListener('pointerenter', onEnter);
             if (onExit) rotator.removeEventListener('pointerleave', onExit);
             observer?.disconnect();
+            if (offTimer) clearTimeout(offTimer);
             unsubscribe?.();
             if (raf !== null) cancelAnimationFrame(raf);
             if (idleRaf !== null) cancelAnimationFrame(idleRaf);
