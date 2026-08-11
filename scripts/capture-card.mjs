@@ -44,7 +44,13 @@ const FRAMES = STILL ? 1 : Number(framesArg) || 24;
  * The GIF renders small instead. It is 24 paints of a full holo card, and driving that at print
  * size took the capture from 15 seconds to 74 for frames nobody views at more than thumbnail size.
  */
-const RENDER_W = STILL ? 760 : 320;
+const RENDER_W = STILL ? 760 : 480;
+
+/**
+ * The colour a pixel is painted before it is thrown away. Nothing on a Pokemon card is pure
+ * magenta, so it cannot collide with real artwork and be knocked transparent by accident.
+ */
+const KEY = [255, 0, 255];
 
 if (!url || !out) {
     console.error('usage: capture-card.mjs <url> <out.gif|out.svg|out.png> [frames] [width] [delayMs]');
@@ -211,20 +217,58 @@ function svg(shot, scale, w, h) {
 }
 
 /** The animation: one shared palette, transparent surround, looping forever. */
+/**
+ * Alpha, resolved the only way a GIF can: one palette entry is transparent, the rest are opaque.
+ *
+ * Done HERE rather than left to the quantiser. The palette used to be built in `rgba4444`, which
+ * spends four of its bits per pixel describing an alpha channel the format cannot store - so the
+ * card was drawn in 4-bit colour (16 levels per channel) and the foil's gradient collapsed into a
+ * hard diagonal band, while the leftover part-alpha entries let the page behind show through the
+ * card itself. Flattening first frees the whole palette for `rgb565`, which is 5-6-5.
+ */
+function keyAlpha(rgba) {
+    for (let i = 0; i < rgba.length; i += 4) {
+        if (rgba[i + 3] < 128) {
+            rgba[i] = KEY[0];
+            rgba[i + 1] = KEY[1];
+            rgba[i + 2] = KEY[2];
+            rgba[i + 3] = 255;
+        } else {
+            rgba[i + 3] = 255;
+        }
+    }
+
+    return rgba;
+}
+
 function gif(shotList, scale, w, h) {
     const enc = GIFEncoder();
     // One palette for the whole animation, built from the middle frame. A per-frame palette makes
     // the surround shimmer between frames, which on a mostly static card is far more obvious than
     // any loss from sharing one.
     //
-    // rgba4444 rather than rgb565, since the palette needs an alpha entry for the transparent
-    // surround.
-    const mid = downscale(PNG.sync.read(Buffer.from(shotList[Math.floor(shotList.length / 2)])), scale, w, h);
-    const palette = quantize(mid, 256, { format: 'rgba4444' });
+    // 255 colours, not 256: the last index is reserved for the key.
+    const mid = keyAlpha(downscale(PNG.sync.read(Buffer.from(shotList[Math.floor(shotList.length / 2)])), scale, w, h));
+    const palette = quantize(mid, 255, { format: 'rgb565' });
+    // The key is appended for WRITING only, never for MATCHING: applyPalette picks the nearest
+    // colour, so a key in the match set means every pink in the artwork - this card's photo
+    // backdrop, the foil's warm glare - can round to it and be punched transparent. Matching sees
+    // 255 real colours; the frame is written with 256, the last of which is the hole.
+    const written = [...palette, KEY];
+    const transparentIndex = written.length - 1;
 
     for (const shot of shotList) {
-        const rgba = downscale(PNG.sync.read(Buffer.from(shot)), scale, w, h);
-        enc.writeFrame(applyPalette(rgba, palette, 'rgba4444'), w, h, { palette, delay: DELAY, transparent: true });
+        const raw = downscale(PNG.sync.read(Buffer.from(shot)), scale, w, h);
+        // Which pixels were see-through, remembered before keyAlpha paints over the answer.
+        const clear = [];
+        for (let i = 3, p = 0; i < raw.length; i += 4, p++) {
+            if (raw[i] < 128) clear.push(p);
+        }
+
+        const idx = applyPalette(keyAlpha(raw), palette, 'rgb565');
+        for (const p of clear) idx[p] = transparentIndex;
+
+        enc.writeFrame(idx, w, h, { palette: written, delay: DELAY, transparent: true, transparentIndex });
     }
     enc.finish();
 

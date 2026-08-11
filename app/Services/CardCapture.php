@@ -36,7 +36,7 @@ class CardCapture
      * Output width for the ANIMATED format. 24 frames of a card is the one thing here with a file
      * size worth minding in a README, so the GIF stays small while the stills do not.
      */
-    private const WIDTH = 320;
+    private const WIDTH = 480;
 
     /**
      * Output width for the stills, which are what people download and what a README renders on a
