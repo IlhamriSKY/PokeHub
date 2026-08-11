@@ -5,6 +5,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import AppLayout from '@/layouts/app-layout';
 import { resolveOverrides, type Axes } from '@/lib/cardModel';
 import { useCardOptions } from '@/lib/options';
@@ -37,6 +38,9 @@ type CardRow = {
     /** Null when the stored card has no profile to draw. */
     card: CardData | null;
 };
+
+/** Radix forbids an empty-string item value, so the "no filter" row needs a sentinel. */
+const ALL = '__all__';
 
 const fmt = (n: number | null) => (n === null ? '—' : n >= 1000 ? `${(n / 1000).toFixed(n >= 10000 ? 0 : 1)}k` : String(n));
 
@@ -146,25 +150,30 @@ export default function AdminCards({
                                         </Button>
                                     ))}
                                     {/* Same vocabulary the public gallery filters on. */}
-                                    <select
-                                        aria-label="Filter by rarity"
-                                        className="border-input bg-background h-8 rounded-md border px-2 text-sm"
-                                        value={filters.rarity ?? ''}
-                                        onChange={(e) =>
+                                    {/* The shared Select, so this filter searches like every
+                                        other dropdown; a bare <select> could not. */}
+                                    <Select
+                                        value={filters.rarity || ALL}
+                                        onValueChange={(v) =>
                                             go({
                                                 ...(q ? { q } : {}),
                                                 ...(filters.filter ? { filter: filters.filter } : {}),
-                                                ...(e.target.value ? { rarity: e.target.value } : {}),
+                                                ...(v !== ALL ? { rarity: v } : {}),
                                             })
                                         }
                                     >
-                                        <option value="">All rarities</option>
-                                        {rarities.map((r) => (
-                                            <option key={r} value={r}>
-                                                {r}
-                                            </option>
-                                        ))}
-                                    </select>
+                                        <SelectTrigger className="h-8 w-[170px]" aria-label="Filter by rarity">
+                                            <SelectValue placeholder="All rarities" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value={ALL}>All rarities</SelectItem>
+                                            {rarities.map((r) => (
+                                                <SelectItem key={r} value={r}>
+                                                    {r}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
                                 </div>
                             </div>
                         </>

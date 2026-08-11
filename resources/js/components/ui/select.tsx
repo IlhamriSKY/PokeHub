@@ -1,5 +1,5 @@
 import * as SelectPrimitive from '@radix-ui/react-select';
-import { Check, ChevronDown, ChevronUp } from 'lucide-react';
+import { Check, ChevronDown, ChevronUp, Search } from 'lucide-react';
 import * as React from 'react';
 
 import { cn } from '@/lib/utils';
@@ -50,10 +50,54 @@ const SelectScrollDownButton = React.forwardRef<
 ));
 SelectScrollDownButton.displayName = SelectPrimitive.ScrollDownButton.displayName;
 
+/**
+ * The open menu's filter text, shared with the items so each one can hide itself.
+ *
+ * A searchable dropdown lives HERE rather than in a separate Combobox component that every call
+ * site would have to opt into: there are ~25 dropdowns across seven files, several of them
+ * choosing between thirty-one rarities or every card asset in the database, and a second
+ * component would have meant converting all of them and keeping two dropdown styles alive in the
+ * meantime. Filtering inside the shared Select means every one of them gained search at once,
+ * and none of the call sites changed.
+ */
+const FilterContext = React.createContext('');
+
+/** A node's visible text, so an item can be matched on what the user actually reads. */
+function text(node: React.ReactNode): string {
+    if (node === null || node === undefined || typeof node === 'boolean') return '';
+    if (typeof node === 'string' || typeof node === 'number') return String(node);
+    if (Array.isArray(node)) return node.map(text).join(' ');
+    if (React.isValidElement(node)) return text((node.props as { children?: React.ReactNode }).children);
+
+    return '';
+}
+
+/** Shown when the filter leaves nothing. */
+/** Does this child - an item, or a group of them - still have anything to show? */
+function matches(node: React.ReactNode, query: string): boolean {
+    if (!React.isValidElement(node)) return false;
+    const kids = (node.props as { children?: React.ReactNode }).children;
+    const own = text(node).toLowerCase().includes(query.toLowerCase());
+
+    return own || React.Children.toArray(kids).some((k) => matches(k, query));
+}
+
+function Empty() {
+    return <div className="text-muted-foreground py-6 text-center text-sm">No match.</div>;
+}
+
+/** Below this many options, a search box is more clutter than help. */
+const SEARCH_THRESHOLD = 8;
+
 const SelectContent = React.forwardRef<
     React.ElementRef<typeof SelectPrimitive.Content>,
     React.ComponentPropsWithoutRef<typeof SelectPrimitive.Content>
->(({ className, children, position = 'popper', ...props }, ref) => (
+>(({ className, children, position = 'popper', ...props }, ref) => {
+    const [query, setQuery] = React.useState('');
+    // Only worth a search box once the list is long enough to scroll past.
+    const searchable = React.Children.toArray(children).length >= SEARCH_THRESHOLD;
+
+    return (
     <SelectPrimitive.Portal>
         <SelectPrimitive.Content
             ref={ref}
@@ -66,6 +110,25 @@ const SelectContent = React.forwardRef<
             position={position}
             {...props}
         >
+            {searchable && (
+                <div className="flex items-center gap-2 border-b px-2" onKeyDown={(e) => e.stopPropagation()}>
+                    <Search className="text-muted-foreground h-3.5 w-3.5 shrink-0" />
+                    <input
+                        // Radix owns keyboard focus inside an open Select and steers letters into
+                        // its own typeahead. Autofocusing on the next frame wins that race, and
+                        // stopping propagation above keeps typing in the box instead of jumping
+                        // the highlight to whichever option starts with that letter.
+                        ref={(el) => {
+                            if (el) requestAnimationFrame(() => el.focus());
+                        }}
+                        value={query}
+                        onChange={(e) => setQuery(e.target.value)}
+                        placeholder="Search..."
+                        aria-label="Filter options"
+                        className="placeholder:text-muted-foreground h-8 w-full bg-transparent text-sm outline-hidden"
+                    />
+                </div>
+            )}
             <SelectScrollUpButton />
             <SelectPrimitive.Viewport
                 className={cn(
@@ -73,12 +136,16 @@ const SelectContent = React.forwardRef<
                     position === 'popper' && 'h-[var(--radix-select-trigger-height)] w-full min-w-[var(--radix-select-trigger-width)]',
                 )}
             >
-                {children}
+                <FilterContext.Provider value={query}>{children}</FilterContext.Provider>
+                {/* Counted here rather than left to the items: each one hides itself, so this is
+                    the only place that can tell whether any of them survived the filter. */}
+                {searchable && query !== '' && !React.Children.toArray(children).some((c) => matches(c, query)) && <Empty />}
             </SelectPrimitive.Viewport>
             <SelectScrollDownButton />
         </SelectPrimitive.Content>
     </SelectPrimitive.Portal>
-));
+    );
+});
 SelectContent.displayName = SelectPrimitive.Content.displayName;
 
 const SelectLabel = React.forwardRef<React.ElementRef<typeof SelectPrimitive.Label>, React.ComponentPropsWithoutRef<typeof SelectPrimitive.Label>>(
@@ -89,7 +156,15 @@ const SelectLabel = React.forwardRef<React.ElementRef<typeof SelectPrimitive.Lab
 SelectLabel.displayName = SelectPrimitive.Label.displayName;
 
 const SelectItem = React.forwardRef<React.ElementRef<typeof SelectPrimitive.Item>, React.ComponentPropsWithoutRef<typeof SelectPrimitive.Item>>(
-    ({ className, children, ...props }, ref) => (
+    ({ className, children, ...props }, ref) => {
+        const query = React.useContext(FilterContext);
+        // Matched on the item's own rendered text, so a caller passing an icon beside a label is
+        // still searchable by the label without every call site declaring a search key.
+        if (query && !text(children).toLowerCase().includes(query.toLowerCase())) {
+            return null;
+        }
+
+        return (
         <SelectPrimitive.Item
             ref={ref}
             className={cn(
@@ -106,7 +181,8 @@ const SelectItem = React.forwardRef<React.ElementRef<typeof SelectPrimitive.Item
 
             <SelectPrimitive.ItemText>{children}</SelectPrimitive.ItemText>
         </SelectPrimitive.Item>
-    ),
+        );
+    },
 );
 SelectItem.displayName = SelectPrimitive.Item.displayName;
 
