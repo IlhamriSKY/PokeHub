@@ -32,17 +32,17 @@ export default function Cards({ cards, q, rarity, showcase = [] }: { cards: Pagi
      * name link all treat them as ordinary cards. `login` is both the slug and the handle for
      * them - their public page is /<login>, the same address the landing page links to.
      *
-     * Ahead of the user rows rather than mixed in: the server only sends them on page one, and
-     * the user list has its own ordering that interleaving would quietly break.
+     * Last, and only on the final page: the grid runs newest first, and these four are the
+     * oldest things on the site. The server decides which page they belong to.
      */
     const rows: CardRow[] = [
+        ...cards.data,
         ...showcase.map((s) => ({
             name: s.name,
             slug: s.login,
             github_login: s.login,
             card: { profile: s.profile, rarity: s.rarity, axes: s.axes },
         })),
-        ...cards.data,
     ];
 
     const [term, setTerm] = useState(q);

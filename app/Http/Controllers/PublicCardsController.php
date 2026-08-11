@@ -8,6 +8,7 @@ use App\Support\GeneratedCards;
 use App\Support\Seo;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Arr;
 use Inertia\Inertia;
 
 class PublicCardsController extends Controller
@@ -40,13 +41,14 @@ class PublicCardsController extends Controller
                     ->orWhere('github_login', 'like', $like));
             })
             ->when($rarity !== '', fn ($query) => $query->where('card->rarity', $rarity))
-            ->orderBy('name')
+            ->orderByDesc('updated_at')
             ->get()
             ->map(fn (User $u) => [
                 'name' => $u->name,
                 'slug' => $u->slug,
                 'github_login' => $u->github_login,
                 'card' => CardPayload::slim($u->card),
+                'at' => (int) ($u->updated_at?->getTimestamp() ?? 0),
             ]);
 
         /*
@@ -55,15 +57,22 @@ class PublicCardsController extends Controller
          * they live in, so the only thing anyone could find here was the handful of claimed
          * accounts and the four homepage cards.
          *
-         * Claimed accounts stay first: they are somebody's own page and they are the ones that can
-         * be kept private, so they are the answer a search is most likely after.
+         * Newest first, across both sources together rather than one list after the other: a card
+         * generated a minute ago should be at the top whether or not anyone has claimed it. The
+         * two carry different clocks - a user row's `updated_at`, a profile's `fetched_at` - so
+         * each is normalised to `at` and the merged list is sorted on that.
          */
-        $rows = $claimed->concat(GeneratedCards::all($q, $rarity)->map(fn (array $g) => [
-            'name' => $g['name'],
-            'slug' => $g['slug'],
-            'github_login' => $g['github_login'],
-            'card' => CardPayload::slim($g['card']),
-        ]));
+        $rows = $claimed
+            ->concat(GeneratedCards::all($q, $rarity)->map(fn (array $g) => [
+                'name' => $g['name'],
+                'slug' => $g['slug'],
+                'github_login' => $g['github_login'],
+                'card' => CardPayload::slim($g['card']),
+                'at' => (int) $g['fetched_at'],
+            ]))
+            ->sortByDesc('at')
+            ->values()
+            ->map(fn (array $r) => Arr::except($r, 'at'));
 
         $page = LengthAwarePaginator::resolveCurrentPage();
         $cards = new LengthAwarePaginator(
@@ -81,13 +90,15 @@ class PublicCardsController extends Controller
             'rarity' => $rarity,
             // Folded into the same grid as everyone else, so they answer to the search box and the
             // rarity filter like any other card rather than sitting above them as a fixed strip.
-            'showcase' => $this->showcase($q, $rarity),
+            'showcase' => $this->showcase($q, $rarity, $cards->currentPage(), $cards->lastPage()),
             'seo' => Seo::private('Card gallery | PokeHub'),
         ]);
     }
 
     /**
-     * The landing showcase, filtered by the same terms as the card query.
+     * The landing showcase, filtered by the same terms as the card query, and sent only with the
+     * LAST page. The gallery runs newest first and these four predate everything, so they belong
+     * at the very end - which on a paginated list means one page, not simply "last in the array".
      *
      * Matched in PHP rather than SQL, because these live in `showcase_cards` and their renderable
      * payload is assembled from a cached `profiles` row: no single query returns them and the
@@ -98,9 +109,9 @@ class PublicCardsController extends Controller
      *
      * @return array<int, array<string, mixed>>
      */
-    private function showcase(string $q, string $rarity): array
+    private function showcase(string $q, string $rarity, int $page, int $lastPage): array
     {
-        if (request()->integer('page', 1) > 1) {
+        if ($page !== $lastPage) {
             return [];
         }
 
