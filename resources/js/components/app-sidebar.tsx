@@ -3,7 +3,7 @@ import { NavUser } from '@/components/nav-user';
 import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from '@/components/ui/sidebar';
 import { type NavItem, type SharedData } from '@/types';
 import { Link, usePage } from '@inertiajs/react';
-import { Activity, IdCard, Images, Search, ShieldCheck, Users, Wand2 } from 'lucide-react';
+import { Activity, IdCard, Images, Search, ShieldCheck, Users } from 'lucide-react';
 import AppLogo from './app-logo';
 
 export function AppSidebar() {
@@ -18,7 +18,6 @@ export function AppSidebar() {
               { title: 'Admin', url: '/admin', icon: ShieldCheck },
               { title: 'Users', url: '/admin/users', icon: Users },
               { title: 'Cards', url: '/admin/cards', icon: IdCard },
-              { title: 'Card lab', url: '/admin/lab', icon: Wand2 },
               { title: 'Card assets', url: '/admin/assets', icon: Images },
               { title: 'Activity log', url: '/admin/activity', icon: Activity },
           ]

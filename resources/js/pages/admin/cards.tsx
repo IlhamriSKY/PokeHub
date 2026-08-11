@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem, type SharedData } from '@/types';
 import { Head, Link, router, usePage } from '@inertiajs/react';
-import { EyeOff, Search } from 'lucide-react';
+import { EyeOff, Search, Wand2 } from 'lucide-react';
 import { useState } from 'react';
 
 const breadcrumbs: BreadcrumbItem[] = [
@@ -34,10 +34,12 @@ const fmt = (n: number | null) => (n === null ? '—' : n >= 1000 ? `${(n / 1000
 export default function AdminCards({
     cards,
     filters,
+    rarities = [],
     totals,
 }: {
     cards: Paginated<CardRow>;
-    filters: { q: string; filter: string | null };
+    filters: { q: string; filter: string | null; rarity: string | null };
+    rarities?: string[];
     totals: { all: number; public: number };
 }) {
     const { flash } = usePage<SharedData>().props;
@@ -103,11 +105,37 @@ export default function AdminCards({
                                             key={t.label}
                                             size="sm"
                                             variant={(filters.filter ?? null) === t.key ? 'default' : 'outline'}
-                                            onClick={() => go({ ...(q ? { q } : {}), ...(t.key ? { filter: t.key } : {}) })}
+                                            onClick={() =>
+                                                go({
+                                                    ...(q ? { q } : {}),
+                                                    ...(t.key ? { filter: t.key } : {}),
+                                                    ...(filters.rarity ? { rarity: filters.rarity } : {}),
+                                                })
+                                            }
                                         >
                                             {t.label}
                                         </Button>
                                     ))}
+                                    {/* Same vocabulary the public gallery filters on. */}
+                                    <select
+                                        aria-label="Filter by rarity"
+                                        className="border-input bg-background h-8 rounded-md border px-2 text-sm"
+                                        value={filters.rarity ?? ''}
+                                        onChange={(e) =>
+                                            go({
+                                                ...(q ? { q } : {}),
+                                                ...(filters.filter ? { filter: filters.filter } : {}),
+                                                ...(e.target.value ? { rarity: e.target.value } : {}),
+                                            })
+                                        }
+                                    >
+                                        <option value="">All rarities</option>
+                                        {rarities.map((r) => (
+                                            <option key={r} value={r}>
+                                                {r}
+                                            </option>
+                                        ))}
+                                    </select>
                                 </div>
                             </div>
                         </>
@@ -171,7 +199,10 @@ export default function AdminCards({
                             <td className="p-2 pr-3">
                                 <div className="flex justify-end gap-1">
                                     <Button asChild size="sm" variant="ghost" className="h-8">
-                                        <Link href={`/admin/lab?edit=${encodeURIComponent(c.key)}`}>Edit</Link>
+                                        <Link href={`/admin/lab?edit=${encodeURIComponent(c.key)}`}>
+                                            <Wand2 className="mr-1 h-3.5 w-3.5" />
+                                            Card lab
+                                        </Link>
                                     </Button>
                                     {/* Moderation acts on a user row. A generated card has none: it is
                                         public because it is unclaimed, and there is no slug to release. */}

@@ -59,6 +59,14 @@ class GenerateCardController extends Controller
             return back()->withErrors(['login' => $error]);
         }
 
+        // Who looked up whom. The card itself says nothing about who asked for it, so without this
+        // there is no record that a signed-in trainer went and generated someone else's handle.
+        // Guests are logged too, with no causer - the row is still the useful half.
+        activity('lookup')
+            ->causedBy($request->user())
+            ->withProperties(['action' => 'generate', 'login' => $login])
+            ->log(($request->user()?->name ?? 'A visitor').' generated @'.$login);
+
         return redirect('/'.$login);
     }
 }

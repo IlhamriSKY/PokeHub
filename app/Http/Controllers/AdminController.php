@@ -196,6 +196,7 @@ class AdminController extends Controller
     {
         $search = trim((string) $request->query('q', ''));
         $only = $request->query('filter'); // 'public' | 'private' | null
+        $rarity = trim((string) $request->query('rarity', ''));
 
         $cards = User::query()
             ->select(['id', 'name', 'email', 'slug', 'is_public', 'avatar', 'github_login', 'updated_at'])
@@ -214,6 +215,7 @@ class AdminController extends Controller
                 ->where('name', 'like', "%{$search}%")
                 ->orWhere('slug', 'like', "%{$search}%")
                 ->orWhere('github_login', 'like', "%{$search}%")))
+            ->when($rarity !== '', fn ($q) => $q->where('card->rarity', $rarity))
             ->orderByDesc('updated_at')
             ->get()
             ->map(fn (User $u) => [
@@ -242,7 +244,7 @@ class AdminController extends Controller
          */
         $rows = $only === 'private'
             ? $cards
-            : $cards->concat(GeneratedCards::all($search)->map(fn (array $g) => [
+            : $cards->concat(GeneratedCards::all($search, $rarity)->map(fn (array $g) => [
                 'id' => null,
                 'name' => $g['name'],
                 'slug' => $g['slug'],
@@ -267,8 +269,10 @@ class AdminController extends Controller
         $cards->withQueryString();
 
         return Inertia::render('admin/cards', [
+            // The same vocabulary the public gallery filters on, so the two offer one list.
+            'rarities' => CardAsset::where('category', 'rarity_preset')->where('enabled', true)->orderBy('label')->pluck('slug'),
             'cards' => $cards,
-            'filters' => ['q' => $search, 'filter' => $only],
+            'filters' => ['q' => $search, 'filter' => $only, 'rarity' => $rarity],
             // Counted across both sources, or the tab labels contradict the table under them.
             'totals' => [
                 'all' => User::whereNotNull('card')->count() + GeneratedCards::all()->count(),

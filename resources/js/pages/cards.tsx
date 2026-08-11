@@ -1,4 +1,5 @@
 import { CardZoom } from '@/components/card-zoom';
+import { Pagination, type Paginated as SharedPaginated } from '@/components/data-table';
 import { PokeCard } from '@/components/PokeCard';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -22,11 +23,8 @@ type CardData = { profile: Profile; rarity: string; axes: Partial<Axes> };
 type ShowcaseEntry = { login: string; name: string; why: string; profile: Profile; rarity: string; axes: Partial<Axes> };
 type CardRow = { name: string; slug: string; github_login: string | null; card: CardData };
 
-type Paginated = {
-    data: CardRow[];
-    links: { url: string | null; label: string; active: boolean }[];
-    total: number;
-};
+/** The shared pager's shape, so this page and the admin tables cannot disagree about a page. */
+type Paginated = SharedPaginated<CardRow>;
 
 export default function Cards({ cards, q, rarity, showcase = [] }: { cards: Paginated; q: string; rarity: string; showcase?: ShowcaseEntry[] }) {
     /*
@@ -152,23 +150,10 @@ export default function Cards({ cards, q, rarity, showcase = [] }: { cards: Pagi
                     </ul>
                 )}
 
-                {cards.links.length > 3 && (
-                    <div className="mt-1 flex flex-wrap justify-center gap-1 border-t pt-4">
-                        {cards.links.map((l, i) =>
-                            l.url ? (
-                                <Link
-                                    key={i}
-                                    href={l.url}
-                                    preserveState
-                                    className={`rounded-md px-2.5 py-1 text-xs ${l.active ? 'bg-primary text-primary-foreground' : 'hover:bg-muted'}`}
-                                    dangerouslySetInnerHTML={{ __html: l.label }}
-                                />
-                            ) : (
-                                <span key={i} className="text-muted-foreground px-2.5 py-1 text-xs" dangerouslySetInnerHTML={{ __html: l.label }} />
-                            ),
-                        )}
-                    </div>
-                )}
+                {/* The same pager the admin tables use. This page had its own, which is how the
+                    two drifted into different type sizes, different hit areas and one of them
+                    rendering Laravel's raw `&laquo;` label as markup. */}
+                <Pagination page={cards} only={['cards', 'q', 'rarity', 'showcase']} />
             </div>
 
             {zoom && (

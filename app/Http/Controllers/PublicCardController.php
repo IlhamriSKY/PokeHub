@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Services\PublicCardLookup;
 use App\Support\Seo;
+use Illuminate\Support\Facades\Cache;
 use Inertia\Inertia;
 
 class PublicCardController extends Controller
@@ -14,7 +15,43 @@ class PublicCardController extends Controller
 
         abort_if(! $found, 404);
 
+        $this->recordView($slug, $found);
+
         return Inertia::render('public-card', $found + ['seo' => $this->seo($slug, $found)]);
+    }
+
+    /**
+     * Log that a signed-in trainer looked at someone's card.
+     *
+     * Signed-in only, and deduplicated to one row per viewer per card per hour. A public page gets
+     * refreshed, prefetched and shared, and an unbounded row per hit would turn the activity log
+     * into a request log nobody can read - and would be a visitor-surveillance table for people
+     * who never identified themselves. A viewer we can name, at hour resolution, answers "who is
+     * looking at whose card" without either problem.
+     */
+    private function recordView(string $slug, array $found): void
+    {
+        $user = request()->user();
+        if (! $user) {
+            return;
+        }
+
+        $login = (string) ($found['card']['profile']['login'] ?? $slug);
+
+        // Their own card is not an interesting row; everyone looks at their own.
+        if (strcasecmp($login, (string) $user->github_login) === 0) {
+            return;
+        }
+
+        $once = Cache::add("viewed:{$user->id}:".strtolower($login), true, now()->addHour());
+        if (! $once) {
+            return;
+        }
+
+        activity('lookup')
+            ->causedBy($user)
+            ->withProperties(['action' => 'view', 'login' => $login])
+            ->log($user->name.' viewed @'.$login);
     }
 
     /**
