@@ -145,8 +145,10 @@ export default function PublicCard({ owner, card }: { owner: { name: string; slu
     const dualElement = overrides.dualType ?? autoDualType(profile.langs, overrides.generation ?? '1-gen', element);
     const elements = dualElement && dualElement !== element ? [element, dualElement] : [element];
 
+    // The card's element, and only that. The ambient behind it stays one colour even when the card
+    // is dual, so the page reads as the type it leads with rather than as a gradient of two.
     const accent = typeColor(element);
-    // A dual card gets both colours: the second only tints, so the card still reads as its primary.
+    // The panel edge still carries a hint of the second, with the primary leading.
     const accent2 = elements.length > 1 ? typeColor(dualElement) : null;
     const edge = accent2 ? `color-mix(in oklab, ${accent} 62%, ${accent2})` : accent;
 
@@ -189,17 +191,11 @@ export default function PublicCard({ owner, card }: { owner: { name: string; slu
             <Head title={`${owner.name} - PokeHub`} />
 
             <div className="bg-background text-foreground relative min-h-screen overflow-hidden">
-                {/* A wash of the card's own energy colour, so the page feels like the card. A dual
-                    card gets one per element, leaning the way the card's diagonal split does:
-                    primary from the left, secondary from the right. */}
+                {/* One wash of the card's element, so the page feels like the card. */}
                 <div
                     aria-hidden="true"
                     className="pointer-events-none absolute inset-x-0 top-0 h-[420px] opacity-[0.14] blur-3xl"
-                    style={{
-                        background: accent2
-                            ? `radial-gradient(55% 60% at 28% 0%, ${accent}, transparent), radial-gradient(55% 60% at 72% 0%, ${accent2}, transparent)`
-                            : `radial-gradient(60% 60% at 50% 0%, ${accent}, transparent)`,
-                    }}
+                    style={{ background: `radial-gradient(60% 60% at 50% 0%, ${accent}, transparent)` }}
                 />
                 {/* The logo mark again, huge and faint, behind the card. */}
                 <AppLogoIcon
