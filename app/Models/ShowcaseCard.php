@@ -27,13 +27,15 @@ class ShowcaseCard extends Model
      */
     public function cardPayload(?Profile $profile): ?array
     {
-        $github = $profile?->github_json;
+        // split(), not github_json: a legacy row keeps everything in `payload` and reading the
+        // column straight makes the card look like a stub, so the showcase silently drops it.
+        [$github, $card] = $profile?->split() ?? [null, null];
         if (! is_array($github) || empty($github['login'])) {
             return null;
         }
 
         return [
-            'profile' => $github + ['ai' => $profile->card_json['ai'] ?? null],
+            'profile' => $github + ['ai' => $card['ai'] ?? null],
             'rarity' => $this->rarity ?: config('pokehub.default_rarity', 'common'),
             'axes' => (object) ($this->axes ?? []),
         ];

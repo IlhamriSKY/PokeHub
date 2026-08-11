@@ -166,8 +166,10 @@ class AvatarCache
             return null;
         }
 
-        $profile = Profile::find($key);
-        $url = is_array($profile?->github_json) ? (string) ($profile->github_json['avatar'] ?? '') : '';
+        // split() rather than github_json, so a row written before the columns were split still
+        // yields a face. Reading the column straight answered 404 for those logins at every size.
+        [$github] = Profile::find($key)?->split() ?? [null];
+        $url = is_array($github) ? (string) ($github['avatar'] ?? '') : '';
 
         if ($url === '') {
             // LOWER() rather than a plain `=`: `profiles.login` is written lower-cased, but

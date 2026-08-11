@@ -78,13 +78,15 @@ class CardSettingsService
             if (! $row) {
                 return null;
             }
-            // The GitHub half comes from the cached profile; only the styling is editable.
-            $profile = Profile::find($row->login)?->github_json;
+            // The GitHub half comes from the cached profile; only the styling is editable. One
+            // find() and split(), so the prose comes from the same row as the profile and a legacy
+            // payload-only row still resolves instead of reading as a stub.
+            [$profile, $card] = Profile::find($row->login)?->split() ?? [null, null];
             if (! is_array($profile) || empty($profile['login'])) {
                 return null;
             }
 
-            $lore = Profile::find($row->login)?->card_json['ai'] ?? null;
+            $lore = $card['ai'] ?? null;
 
             return [
                 'key' => $key,
@@ -201,9 +203,12 @@ class CardSettingsService
                 // Card prose lives on the cached profile row, which is what renders. The showcase
                 // row only carries the editorial caption.
                 $profileRow = Profile::find($row->login);
-                if ($profileRow) {
-                    $card = (array) $profileRow->card_json;
-                    $github = (array) $profileRow->github_json;
+                // split() rather than casting the columns: on a legacy row `github_json` is null,
+                // so `(array) null` plus a name wrote the whole profile away as `{"name": "..."}` -
+                // renaming a showcase card would have destroyed the card it renames.
+                [$github, $card] = $profileRow?->split() ?? [null, null];
+                if (is_array($github) && ! empty($github['login'])) {
+                    $card = (array) $card;
                     $card['ai'] = $this->mergeLore($card['ai'] ?? null, $text);
                     $github['name'] = $text['name'];
                     $profileRow->update(['card_json' => $card, 'github_json' => $github]);

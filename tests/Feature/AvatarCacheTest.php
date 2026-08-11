@@ -133,6 +133,25 @@ class AvatarCacheTest extends TestCase
         $this->assertFileDoesNotExist(app(AvatarCache::class)->path('torvalds', 360));
     }
 
+    /**
+     * Rows written before `github_json`/`card_json` were split still hold everything in `payload`.
+     * locate() read the column straight, so those logins answered 404 at all four sizes - a card
+     * with a hole where the face goes, and not even the redirect-to-GitHub fallback, since with no
+     * url found there was nothing to redirect to.
+     */
+    public function test_it_serves_a_face_for_a_row_written_before_the_columns_were_split(): void
+    {
+        Profile::create([
+            'login' => 'sindresorhus',
+            'github_json' => null,
+            'payload' => ['login' => 'sindresorhus', 'avatar' => 'https://avatars.githubusercontent.com/u/170270?v=4'],
+            'fetched_at' => time(),
+        ]);
+        $this->fakeImage();
+
+        $this->get('/avatar/sindresorhus?s=360')->assertOk()->assertHeader('Content-Type', 'image/png');
+    }
+
     /** A claimed account keeps its own copy on the user row rather than in `profiles`. */
     public function test_it_finds_a_claimed_account_by_its_github_login(): void
     {

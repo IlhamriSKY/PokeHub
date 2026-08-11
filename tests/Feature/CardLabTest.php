@@ -84,6 +84,41 @@ class CardLabTest extends TestCase
     }
 
     /**
+     * The same edit against a row that still keeps everything in `payload`.
+     *
+     * save() built the new profile from `(array) $profileRow->github_json`, which on a legacy row is
+     * `(array) null` - so writing a name replaced the whole profile with `{"name": "..."}` and the
+     * card it renames was gone, login and stats and all. The read half was blind the same way, so
+     * the lab could not even show the card it was about to destroy.
+     */
+    public function test_renaming_a_showcase_card_does_not_wipe_a_legacy_profile()
+    {
+        Profile::create([
+            'login' => 'sindresorhus',
+            'github_json' => null,
+            'payload' => ['login' => 'sindresorhus', 'name' => 'Sindre Sorhus', 'followers' => 61000, 'ai' => ['species' => 'Old']],
+            'fetched_at' => 0,
+        ]);
+        $showcase = ShowcaseCard::create(['login' => 'sindresorhus', 'name' => 'Sindre Sorhus', 'axes' => [], 'is_active' => true]);
+
+        $this->actingAs($this->admin())
+            ->put('/admin/lab', [
+                'key' => "showcase:{$showcase->id}",
+                'rarity' => 'secret',
+                'axes' => [],
+                'text' => $this->text(),
+            ])
+            ->assertSessionHasNoErrors();
+
+        $profile = Profile::find('sindresorhus');
+        $this->assertSame('Ash Ketchum', $profile->github_json['name']);
+        // The generated half survives the rename, which is the whole point.
+        $this->assertSame('sindresorhus', $profile->github_json['login']);
+        $this->assertSame(61000, $profile->github_json['followers']);
+        $this->assertSame('Code Trainer', $profile->card_json['ai']['species']);
+    }
+
+    /**
      * A cleared caption stays cleared. ConvertEmptyStringsToNull turns the emptied field into
      * null, which a `??` fallback would read as "not sent" and restore.
      */
