@@ -233,4 +233,36 @@ class CardLabTest extends TestCase
             ->assertOk()
             ->assertDontSee('do-not-leak');
     }
+
+    /**
+     * A generated card belongs to nobody, so its handle is `profile:<login>` rather than an id. The
+     * key rule only spelled out the two numbered kinds, so every save against the cards the site
+     * produces most of was rejected before save() - which has handled them all along - ever ran.
+     */
+    public function test_admin_can_restyle_a_generated_card_that_has_no_user()
+    {
+        Profile::create([
+            'login' => 'octocat',
+            'github_json' => ['login' => 'octocat', 'name' => 'The Octocat', 'followers' => 9000],
+            'card_json' => ['ai' => ['species' => 'Old']],
+            'fetched_at' => 0,
+        ]);
+
+        $this->actingAs($this->admin())
+            ->put('/admin/lab', [
+                'key' => 'profile:octocat',
+                'rarity' => 'secret',
+                'axes' => ['generation' => '1-gen'],
+                'text' => $this->text(),
+            ])
+            ->assertSessionHasNoErrors();
+
+        $profile = Profile::find('octocat');
+        $this->assertSame('secret', $profile->card_json['rarity']);
+        $this->assertSame('1-gen', $profile->card_json['axes']['generation']);
+        $this->assertSame('Code Trainer', $profile->card_json['ai']['species']);
+        $this->assertSame('Ash Ketchum', $profile->github_json['name']);
+        // Generated fields stay put, same as the user branch.
+        $this->assertSame(9000, $profile->github_json['followers']);
+    }
 }
