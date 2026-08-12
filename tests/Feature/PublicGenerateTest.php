@@ -241,6 +241,40 @@ class PublicGenerateTest extends TestCase
     }
 
     /**
+     * A card born from the public search box is complete on the way in.
+     *
+     * The three fields that used to be decided at render time - the rarity, the frame and the foil
+     * - must all be on the row the moment it is written, or the card is not a card yet: it is a
+     * profile plus a set of defaults, which is how every generated card ended up a 1-gen Base Set
+     * frame with the holo on auto.
+     */
+    public function test_a_freshly_generated_card_stores_its_rarity_frame_and_foil()
+    {
+        $this->seed(CardAssetSeeder::class);
+        // The suite inherits a real AI key from .env, and this test is about the three fields the
+        // row is written with, not the lore. Leaving it on spent twenty seconds per run waiting on
+        // a call preventStrayRequests was going to refuse anyway.
+        config(['pokehub.ai.enabled' => false]);
+        Http::fake([
+            'api.github.com/users/octocat' => Http::response([
+                'login' => 'octocat', 'name' => 'The Octocat', 'followers' => 9000, 'created_at' => '2011-01-25T18:44:36Z',
+            ]),
+            'api.github.com/users/octocat/repos*' => Http::response([]),
+        ]);
+
+        $this->post('/generate', ['login' => 'octocat'])->assertRedirect('/octocat');
+
+        $card = Profile::find('octocat')->card_json;
+        $this->assertNotEmpty($card['rarity'], 'no rarity stored, so every reader recomputes one');
+        $this->assertNotEmpty($card['axes']['generation'] ?? '', 'no frame stored, so it defaults to 1-gen');
+        $this->assertNotSame('auto', $card['axes']['glare'] ?? 'auto', 'the foil was left on auto');
+
+        // And the foil it picked is the one the rarity already prints, so storing it changed nothing.
+        $svc = app(GithubCardService::class);
+        $this->assertSame($svc->glareFor($card['rarity']), $card['axes']['glare']);
+    }
+
+    /**
      * A generated card picks its own generation, and the three sets get used.
      *
      * The axes blob used to be empty, which meant DEFAULT_AXES - and that pins the generation to
