@@ -1214,7 +1214,7 @@
     bottom: 1.6%;
     /* Scaled with the other generations' badges; this one sits in the bottom band rather than the
        artwork, so it has no vertical offset to keep in step. */
-    width: 15cqw;
+    width: 12cqw; /* 15 -20% */
     z-index: 3;
 }
 /* 1st-gen dual type: the base frame bakes the PRIMARY emblem near the right edge
@@ -1273,10 +1273,10 @@
 .gen-tcg-gen .pcg-badge,
 .gen-scarlet-violet .pcg-badge {
     right: 1.5%;
-    top: calc(40.66% - 13.5cqw);
+    top: calc(40.66% - 10.8cqw); /* half of the box below */
     bottom: auto;
-    width: 27cqw;
-    height: 27cqw;
+    width: 21.6cqw; /* 27 -20% */
+    height: 21.6cqw;
     /* Round symbols then land on the measured right edge instead of floating off it when a
        wide wordmark badge leaves slack in the box. */
     object-position: right center;

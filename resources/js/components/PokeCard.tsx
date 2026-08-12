@@ -178,10 +178,7 @@ export function PokeCard({
                             iconUrl={iconUrl}
                             effectUrls={effectUrls}
                             attributeFrame={attributeFrame}
-                            tagUrl={tagUrl}
-                            tagSlug={tagSlug}
                             firstEdition={firstEdition}
-                            badgeUrl={badgeUrl}
                             ruleUrl={ruleUrl}
                             frameOverlayUrl={frameOverlayUrl}
                             rarityMark={rarityMark}
@@ -221,6 +218,32 @@ export function PokeCard({
                                     )}
                                 </div>
                             )}
+                        {/* Set badge + tag stamp, in the same after-the-foil sibling layer the stage
+                            chrome uses and for the same reason: nothing inside `.pcg` can paint above
+                            `.card__shine`.
+
+                            Above the foil on EVERY card, whichever way the holo is clipped - the one
+                            that covers the whole card (reverse holo, V, VMAX, rainbow, secret...) as
+                            much as the one confined to the photo window (rare holo, cosmos). A real
+                            card prints its ink ON TOP of the foil layer, so a set symbol or a tag
+                            stamp never shimmers; both stamps straddle the window edge on tcg / SV, so
+                            under the foil they came out half-washed either way. */}
+                        {(tagUrl || badgeUrl) && (
+                            <div
+                                className={cn(
+                                    'pcg',
+                                    `gen-${gen}`,
+                                    'pcg-chrome-layer',
+                                    // `.gen-1-gen.pcg-trainer .pcg-tag` re-anchors the stamp to the
+                                    // trainer window, and it is a COMPOUND selector - it has to land
+                                    // on this element, not on the .card wrapper.
+                                    gen === '1-gen' && variant === 'trainer' && 'pcg-trainer',
+                                )}
+                            >
+                                {tagUrl && <img className="pcg-tag" data-tag={tagSlug} src={tagUrl} alt="" />}
+                                {badgeUrl && <img className="pcg-badge" src={badgeUrl} alt="" />}
+                            </div>
+                        )}
                     </div>
                 </div>
             </div>

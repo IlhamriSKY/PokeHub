@@ -104,10 +104,7 @@ export function PcgFace({
     iconUrl,
     effectUrls,
     attributeFrame,
-    tagUrl,
-    tagSlug,
     firstEdition,
-    badgeUrl,
     ruleUrl,
     frameOverlayUrl,
     rarityMark,
@@ -132,10 +129,9 @@ export function PcgFace({
     /* TCG Pocket "Attribute frame": a decorative BORDER around the art window + attribute strip,
        drawn on canvas upstream rather than composited from a file, so we reproduce it in CSS. */
     attributeFrame?: string;
-    tagUrl?: string; // corner tag stamp (DB tag asset)
-    tagSlug?: string; // -> data-tag, so one tag's size can be nudged without touching the rest
     firstEdition?: boolean; // Base Set "EDITION 1" stamp - 1st gen only, on Regular AND Trainer
-    badgeUrl?: string; // corner set badge (DB badge asset)
+    /* The set badge and tag stamp are NOT drawn here. Both have to paint above the holo, and
+       nothing inside `.pcg` can - PokeCard renders them in a sibling layer after the foil. */
     ruleUrl?: string; // TCG Pocket "ex rule" band (DB rule asset) - tcg-gen only
     frameOverlayUrl?: string; // frame-style finish overlay (DB frame asset)
     rarityMark?: RarityMark; // bottom rarity pips (DB rarity asset x count)
@@ -186,7 +182,6 @@ export function PcgFace({
                     NO.{d.join_year ?? '0000'} · {d.top_lang || type} · {fmt(d.repos)} REPOS · {fmt(d.stars)} STARS
                 </span>
                 <FirstEdition />
-                {tagUrl && <img className="pcg-tag" data-tag={tagSlug} src={tagUrl} alt="" />}
                 {rarityMark && (
                     <div className="pcg-rarity">
                         {Array.from({ length: rarityMark.count }).map((_, i) => (
@@ -258,8 +253,6 @@ export function PcgFace({
                         <p>You may play only 1 Supporter card during your turn.</p>
                     </div>
                 )}
-                {tagUrl && <img className="pcg-tag" data-tag={tagSlug} src={tagUrl} alt="" />}
-                {badgeUrl && <img className="pcg-badge" src={badgeUrl} alt="" />}
                 {rarityMark && (
                     <div className="pcg-rarity">
                         {Array.from({ length: rarityMark.count }).map((_, i) => (
@@ -430,8 +423,6 @@ export function PcgFace({
             </div>
 
             <FirstEdition />
-            {tagUrl && <img className="pcg-tag" data-tag={tagSlug} src={tagUrl} alt="" />}
-            {badgeUrl && <img className="pcg-badge" src={badgeUrl} alt="" />}
             {rarityMark && (
                 <div className="pcg-rarity">
                     {Array.from({ length: rarityMark.count }).map((_, i) => (
