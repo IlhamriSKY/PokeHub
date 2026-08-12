@@ -26,7 +26,22 @@ type CardRow = { name: string; slug: string; github_login: string | null; card: 
 /** The shared pager's shape, so this page and the admin tables cannot disagree about a page. */
 type Paginated = SharedPaginated<CardRow>;
 
-export default function Cards({ cards, q, rarity, showcase = [] }: { cards: Paginated; q: string; rarity: string; showcase?: ShowcaseEntry[] }) {
+export default function Cards({
+    cards,
+    q,
+    rarity,
+    per,
+    perOptions,
+    showcase = [],
+}: {
+    cards: Paginated;
+    q: string;
+    rarity: string;
+    /** Page size, and the sizes offered. Both come from PublicCardsController, which validates on the same list. */
+    per: number;
+    perOptions: number[];
+    showcase?: ShowcaseEntry[];
+}) {
     /*
      * The showcase four, wearing the same shape as everyone else so the grid, the zoom and the
      * name link all treat them as ordinary cards. `login` is both the slug and the handle for
@@ -47,6 +62,7 @@ export default function Cards({ cards, q, rarity, showcase = [] }: { cards: Pagi
 
     const [term, setTerm] = useState(q);
     const [tier, setTier] = useState(rarity || ALL);
+    const [size, setSize] = useState(String(per));
     const [zoom, setZoom] = useState<CardRow | null>(null);
     const closeZoom = useCallback(() => setZoom(null), []);
     const { options } = useCardOptions();
@@ -63,17 +79,25 @@ export default function Cards({ cards, q, rarity, showcase = [] }: { cards: Pagi
         const t = setTimeout(() => {
             router.get(
                 '/cards',
-                { ...(term ? { q: term } : {}), ...(tier !== ALL ? { rarity: tier } : {}) },
+                // `per` is always sent, unlike the two filters, which are dropped when empty to
+                // keep the address clean. Dropping it when it matches would hand the next search
+                // a URL with no size on it, and the server would answer with the default instead
+                // of the size still showing in the control.
+                //
+                // No `page` either, so any change here lands on the first one. Changing the page
+                // size while on page 4 of 6 has no honest answer: the row you were looking at is
+                // on a different page now, whatever number we send.
+                { ...(term ? { q: term } : {}), ...(tier !== ALL ? { rarity: tier } : {}), per: size },
                 // Partial reload: skips recomputing the shared auth/permission props. `showcase`
                 // MUST be in the list even though it looks like a constant - it is filtered by the
                 // same query, and leaving it out meant the first page kept the four homepage cards
                 // from the initial load no matter what you typed.
-                { preserveState: true, replace: true, only: ['cards', 'q', 'rarity', 'showcase'] },
+                { preserveState: true, replace: true, only: ['cards', 'q', 'rarity', 'per', 'showcase'] },
             );
         }, 300);
 
         return () => clearTimeout(t);
-    }, [term, tier]);
+    }, [term, tier, size]);
 
     const render = (row: CardRow) => {
         const rarity = rarityOf(rarities, row.card?.rarity);
@@ -113,6 +137,22 @@ export default function Cards({ cards, q, rarity, showcase = [] }: { cards: Pagi
                             {rarities.map((r) => (
                                 <SelectItem key={r.key} value={r.key}>
                                     {r.label}
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+
+                    {/* Narrower than the rarity filter and last in the row: it changes how much of
+                        the list you see rather than which cards are in it, so it should not read as
+                        a third filter. */}
+                    <Select value={size} onValueChange={setSize}>
+                        <SelectTrigger className="w-[130px] shrink-0" aria-label="Cards per page">
+                            <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                            {perOptions.map((n) => (
+                                <SelectItem key={n} value={String(n)}>
+                                    {n} per page
                                 </SelectItem>
                             ))}
                         </SelectContent>

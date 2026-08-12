@@ -14,19 +14,31 @@ use Inertia\Inertia;
 class PublicCardsController extends Controller
 {
     /**
-     * Divisible by every column count the grid settles on (it auto-fills between 2 and 8), so the
-     * last row is full at any width. Held back from going higher by paint cost rather than
-     * payload: every card carries the holo foil's stacked blend layers.
+     * Page sizes the visitor may pick between.
      *
-     * Both halves of the list are already in memory by the time this applies, so CardPayload trims
-     * each card on the way out rather than relying on the page size to bound the response.
+     * 24 used to be the only one, chosen because it divides by every column count the grid settles
+     * on (it auto-fills between 2 and 8) so the last row was always full. A choice gives that up -
+     * 20 leaves a gap at 3 and 6 columns - which is what the control costs. Kept as a list rather
+     * than a min/max, because the number reaches the paginator and an open range is an invitation
+     * to ask for a page of ten thousand.
+     *
+     * The ceiling is paint cost rather than payload: every card carries the holo foil's stacked
+     * blend layers. Both halves of the list are already in memory by the time this applies, so
+     * CardPayload trims each card on the way out instead of relying on the page size to bound the
+     * response.
      */
-    private const PER_PAGE = 24;
+    public const PER_PAGE_OPTIONS = [10, 20, 40, 50];
+
+    private const PER_PAGE = 20;
 
     public function index(Request $request)
     {
         $q = trim((string) $request->query('q', ''));
         $rarity = trim((string) $request->query('rarity', ''));
+        // Off the allowlist rather than clamped: a hand-typed ?per=37 answering with 37 cards makes
+        // the control disagree with the page it produced.
+        $per = (int) $request->query('per', self::PER_PAGE);
+        $per = in_array($per, self::PER_PAGE_OPTIONS, true) ? $per : self::PER_PAGE;
 
         $claimed = User::query()
             ->select(['id', 'name', 'slug', 'github_login', 'card'])
@@ -76,9 +88,9 @@ class PublicCardsController extends Controller
 
         $page = LengthAwarePaginator::resolveCurrentPage();
         $cards = new LengthAwarePaginator(
-            $rows->forPage($page, self::PER_PAGE)->values(),
+            $rows->forPage($page, $per)->values(),
             $rows->count(),
-            self::PER_PAGE,
+            $per,
             $page,
             ['path' => LengthAwarePaginator::resolveCurrentPath()]
         );
@@ -88,6 +100,10 @@ class PublicCardsController extends Controller
             'cards' => $cards,
             'q' => $q,
             'rarity' => $rarity,
+            'per' => $per,
+            // Sent rather than repeated in the page, so the control and the allowlist that
+            // validates it cannot drift apart.
+            'perOptions' => self::PER_PAGE_OPTIONS,
             // Folded into the same grid as everyone else, so they answer to the search box and the
             // rarity filter like any other card rather than sitting above them as a fixed strip.
             'showcase' => $this->showcase($q, $rarity, $cards->currentPage(), $cards->lastPage()),

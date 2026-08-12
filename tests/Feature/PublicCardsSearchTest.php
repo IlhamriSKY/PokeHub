@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Http\Controllers\PublicCardsController;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -22,7 +23,7 @@ class PublicCardsSearchTest extends TestCase
      * affordable: `top_repos` and `all_langs` are AI prompt inputs that nothing on the card draws,
      * and at roughly a third of each blob they would otherwise be the bulk of the response.
      */
-    public function test_a_gallery_page_holds_24_cards_without_their_ai_inputs()
+    public function test_a_gallery_page_holds_one_page_of_cards_without_their_ai_inputs()
     {
         User::factory()->count(30)->sequence(fn ($s) => ['slug' => 'trainer-'.$s->index])->create([
             'is_public' => true,
@@ -42,11 +43,42 @@ class PublicCardsSearchTest extends TestCase
             ->assertOk()
             ->assertInertia(fn ($page) => $page
                 ->where('cards.total', 30)
-                ->count('cards.data', 24)
+                ->count('cards.data', 20)
                 // Still everything the face prints.
                 ->where('cards.data.0.card.profile.followers', 1)
                 ->missing('cards.data.0.card.profile.top_repos')
                 ->missing('cards.data.0.card.profile.all_langs'));
+    }
+
+    /**
+     * The page-size control, and the guard behind it.
+     *
+     * `per` reaches the paginator, so it is matched against the allowlist rather than clamped: a
+     * hand-typed size must fall back to the default, not answer with a page of that size, or the
+     * control ends up disagreeing with the page it produced.
+     */
+    public function test_the_page_size_is_chosen_from_a_fixed_list()
+    {
+        User::factory()->count(60)->sequence(fn ($s) => ['slug' => 'trainer-'.$s->index])->create([
+            'is_public' => true,
+            'card' => ['rarity' => 'holo', 'profile' => ['name' => 'x', 'followers' => 1]],
+        ]);
+        $me = User::factory()->create();
+
+        foreach (PublicCardsController::PER_PAGE_OPTIONS as $size) {
+            $this->actingAs($me)
+                ->get('/cards?per='.$size)
+                ->assertOk()
+                ->assertInertia(fn ($page) => $page->where('per', $size)->count('cards.data', $size));
+        }
+
+        // Off the list, negative, and not a number at all: each falls back to the default.
+        foreach (['37', '-5', 'lots'] as $bogus) {
+            $this->actingAs($me)
+                ->get('/cards?per='.$bogus)
+                ->assertOk()
+                ->assertInertia(fn ($page) => $page->where('per', 20)->count('cards.data', 20));
+        }
     }
 
     public function test_private_cards_are_never_listed()
