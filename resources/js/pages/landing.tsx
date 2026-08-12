@@ -1,3 +1,4 @@
+import { BackToTop } from '@/components/back-to-top';
 import { CardZoom } from '@/components/card-zoom';
 import GenerateForm from '@/components/generate-form';
 import GridBackdrop from '@/components/grid-backdrop';
@@ -6,7 +7,7 @@ import LoginPanel from '@/components/login-panel';
 import { PokeCard } from '@/components/PokeCard';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { useAppearance, type Appearance } from '@/hooks/use-appearance';
+import { useAppearance } from '@/hooks/use-appearance';
 import { resolveOverrides, type Axes } from '@/lib/cardModel';
 import { useCardOptions, type CardOptions } from '@/lib/options';
 import { raritiesFromOptions, rarityOf, type Profile, type Rarity } from '@/lib/rarities';
@@ -71,6 +72,9 @@ function Pokeball({ className, strokeWidth = 3 }: { className?: string; strokeWi
         </svg>
     );
 }
+
+/** The source. GPL-3.0, and the one link on the page that leaves for something other than a card. */
+const REPO_URL = 'https://github.com/IlhamriSKY/PokeHub';
 
 /**
  * The GitHub mark, the same path the login screen draws. On the button because GitHub is the only
@@ -156,31 +160,27 @@ const FAQ = [
     },
 ];
 
+/** Shared by the icon buttons in the header, so the pair reads as one control group. */
+const ICON_BUTTON = 'text-muted-foreground hover:text-foreground hover:bg-muted/70 grid h-8 w-8 place-items-center rounded-full transition-colors';
+
+/**
+ * One button, not two. There are only ever two themes (see useAppearance), and with no "system"
+ * option to pick out of a set, a segmented control was two controls to say one bit.
+ *
+ * The icon is the DESTINATION rather than the current theme: on a dark page the button offers a
+ * sun. Showing the state instead reads as "you are here" on a thing that is only ever clicked to
+ * leave, which is the coin-flip every one-button toggle has to call one way.
+ */
 function ThemeSwitch() {
     const { appearance, updateAppearance } = useAppearance();
-    // Light and dark only, with no "system" option.
-    const themes: { key: Appearance; icon: typeof Sun; label: string }[] = [
-        { key: 'light', icon: Sun, label: 'Light' },
-        { key: 'dark', icon: Moon, label: 'Dark' },
-    ];
+    const dark = appearance === 'dark';
+    const Icon = dark ? Sun : Moon;
+    const label = `Switch to ${dark ? 'light' : 'dark'} theme`;
+
     return (
-        <div className="bg-muted/70 flex items-center rounded-full p-0.5" role="group" aria-label="Theme">
-            {themes.map((th) => (
-                <button
-                    key={th.key}
-                    type="button"
-                    onClick={() => updateAppearance(th.key)}
-                    aria-pressed={appearance === th.key}
-                    aria-label={th.label}
-                    title={th.label}
-                    className={`rounded-full p-1.5 transition-colors ${
-                        appearance === th.key ? 'bg-background text-foreground ring-border ring-1' : 'text-muted-foreground hover:text-foreground'
-                    }`}
-                >
-                    <th.icon className="h-3.5 w-3.5" />
-                </button>
-            ))}
-        </div>
+        <button type="button" onClick={() => updateAppearance(dark ? 'light' : 'dark')} aria-label={label} title={label} className={ICON_BUTTON}>
+            <Icon className="h-4 w-4" />
+        </button>
     );
 }
 
@@ -325,6 +325,13 @@ export default function Landing({ showcase, showLogin, status }: { showcase: Sho
                 with the share card and with what Google indexed. */}
             <Head title="PokeHub - any GitHub profile as a Pokémon card" />
 
+            {/* First, not last: this renders its own mark at the point it sits in the document, and
+                that mark is what "the top of the page" means to it. The button itself is `fixed`
+                with a z-index, so nothing about where it appears on screen depends on being here.
+                The landing is by far the longest scroll in the app - hero, four sections, the FAQ
+                and the CTA - which is what makes it worth having here and nowhere shorter. */}
+            <BackToTop />
+
             <header className="border-border/60 bg-background/80 sticky top-0 z-30 border-b backdrop-blur-md">
                 <div className="mx-auto flex max-w-6xl items-center gap-2 px-4 py-3">
                     <Link href="/" className="flex items-center gap-2 text-lg font-black tracking-tight">
@@ -334,9 +341,22 @@ export default function Landing({ showcase, showLogin, status }: { showcase: Sho
                             <span className="text-amber-400">Hub</span>
                         </span>
                     </Link>
-                    <div className="ml-auto flex items-center gap-1.5">
+                    <div className="ml-auto flex items-center gap-0.5">
                         <ThemeSwitch />
-                        <Button asChild size="sm" variant={signedIn ? 'outline' : 'default'}>
+                        {/* Not a Link: an external destination, so it must be a real anchor that a
+                            middle click opens and a crawler follows. rel closes the reverse-tabnabbing
+                            hole target="_blank" opens. */}
+                        <a
+                            href={REPO_URL}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            aria-label="PokeHub source on GitHub"
+                            title="PokeHub source on GitHub"
+                            className={ICON_BUTTON}
+                        >
+                            <GithubMark />
+                        </a>
+                        <Button asChild size="sm" variant={signedIn ? 'outline' : 'default'} className="ml-1.5">
                             <Link href={ctaHref} {...ctaProps}>
                                 {signedIn ? 'Dashboard' : 'Sign in'}
                             </Link>
@@ -397,11 +417,18 @@ export default function Landing({ showcase, showLogin, status }: { showcase: Sho
                                 something - on a card, to claim it. */}
                             <GenerateForm />
 
+                            {/* A real control, not a line of underlined text. The search box above
+                                is the page's primary action, so this one has to read as the button
+                                that lost the argument rather than as prose that happens to be
+                                clickable - outline keeps the hierarchy without giving up the
+                                target size. Still a plain anchor: it is a hash jump, not a visit. */}
                             <div className="mt-5">
-                                <a href="#how" className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5 text-sm">
-                                    {'See how it works'}
-                                    <ArrowRight className="h-3.5 w-3.5" />
-                                </a>
+                                <Button asChild variant="outline">
+                                    <a href="#how">
+                                        {'See how it works'}
+                                        <ArrowRight />
+                                    </a>
+                                </Button>
                             </div>
                         </div>
 
@@ -600,17 +627,13 @@ export default function Landing({ showcase, showLogin, status }: { showcase: Sho
                         the capture wobble is the point, whereas behind the headline it was 34rem of
                         motion under text people were trying to read.
 
-                        Anchored to the BOTTOM, not the panel's centre. Centred, a 160px disc lands
-                        exactly on the body copy and drew a moving hairline through the sentence.
-                        From `bottom-4` it spans 16-176px off the floor, which is the badge and the
-                        button - both opaque, so the ball reads as a ring around the button instead
-                        of a line through a paragraph. Growing it past h-40 puts the apex back into
-                        the copy, and a bigger --tilt buys the liveliness the small radius costs. */}
-                    <LinePokeball
-                        className="bottom-4 left-1/2 -z-10 -translate-x-1/2 opacity-[0.10] dark:opacity-[0.14]"
-                        size="h-40 w-40"
-                        tilt="12deg"
-                    />
+                        Cropped by the bottom-right corner, the same treatment and the same inset as
+                        the types panel further up, so the page has one corner-ball idiom rather than
+                        two. It used to sit bottom-centre, which put a moving hairline behind the
+                        button and the badges - everything on this panel is centred, so the centre
+                        was the one column it could not have. The corner is the only region no
+                        content reaches at any width, which is what lets the wobble stay. */}
+                    <LinePokeball className="-right-16 -bottom-16 -z-10 opacity-[0.10] dark:opacity-[0.14]" size="h-40 w-40" tilt="12deg" />
                     {/* Only the button says "Sign in": it is the thing being clicked, and repeating
                         it in the heading and the body reads as nagging. */}
                     <h2 className="text-2xl font-bold tracking-tight text-balance sm:text-3xl">
@@ -621,20 +644,44 @@ export default function Landing({ showcase, showLogin, status }: { showcase: Sho
                             ? 'Open your dashboard to restyle it, publish it, or copy the README embed.'
                             : 'Anyone can generate your card up there, and someone may already have. Signing in makes it yours - regenerate it, restyle it, or make it private.'}
                     </p>
-                    <div className="mt-7">
+                    {/* Two buttons on one row, not a button with a text link hanging under it: the
+                        gallery is the other half of what an account is for, and underlined prose
+                        beneath a solid button reads as a footnote rather than as the second of two
+                        choices. Outline, so the primary still wins the eye; the same h-12, so the
+                        pair sits on one baseline.
+
+                        The gallery is behind the sign-in, which is what makes this a second reason
+                        for a guest to press the button beside it rather than a link that dead-ends:
+                        `auth` stores /cards as the intended URL, so the trip through GitHub lands
+                        them there. Stacked below sm, where two of these will not share a row. */}
+                    <div className="mt-7 flex flex-col items-stretch justify-center gap-3 sm:flex-row sm:items-center">
                         <Button asChild size="lg" className="h-12 gap-2.5 px-7 text-base">
                             <Link href={ctaHref} {...ctaProps}>
                                 {!signedIn && <GithubMark />}
                                 {signedIn ? 'Go to dashboard' : 'Continue with GitHub'}
                             </Link>
                         </Button>
+                        <Button asChild size="lg" variant="outline" className="h-12 gap-2.5 px-7 text-base">
+                            <Link href="/cards">
+                                {'Browse cards from other trainers'}
+                                <ArrowRight />
+                            </Link>
+                        </Button>
                     </div>
-                    {/* The two objections that stop a signup, answered where the click happens
-                        rather than three sections up in the FAQ. Same Badge the hero opens with, so
-                        the page starts and ends on the same shape. */}
-                    <Badge variant="secondary" className="mt-5 px-3 py-1 font-normal">
-                        {'Free · Public Data Only · No Repository Access'}
-                    </Badge>
+
+                    {/* The objections that stop a signup, answered where the click happens rather
+                        than three sections up in the FAQ. One claim per badge: run together on a
+                        single line with interpuncts they read as one long phrase and neither
+                        landed. Same Badge the hero opens with, so the page starts and ends on the
+                        same shape. */}
+                    <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
+                        <Badge variant="secondary" className="px-3 py-1 font-normal">
+                            {'Free'}
+                        </Badge>
+                        <Badge variant="secondary" className="px-3 py-1 font-normal">
+                            {'Public Data Only'}
+                        </Badge>
+                    </div>
                 </div>
             </section>
 
