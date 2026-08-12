@@ -47,7 +47,8 @@ class AdminController extends Controller
         // Every text field is length-capped: these render into fixed printed boxes on the card
         // frame, and an unbounded string overflows the art rather than wrapping.
         $data = $request->validate([
-            'key' => ['required', 'string', 'regex:/^(user|showcase):\d+$/'],
+            // Generated cards are keyed by login, not id - they have no user row to number.
+            'key' => ['required', 'string', 'regex:/^(?:(?:user|showcase):\d+|profile:[\w-]{1,39})$/'],
             'rarity' => ['required', 'string', 'max:40'],
             // `present` rather than `required`, since a card with default styling has an empty
             // axes blob and `required` rejects an empty array.

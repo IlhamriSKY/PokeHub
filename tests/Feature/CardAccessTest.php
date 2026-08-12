@@ -2,10 +2,12 @@
 
 namespace Tests\Feature;
 
+use App\Http\Controllers\LandingController;
 use App\Models\Profile;
 use App\Models\ShowcaseCard;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
@@ -96,6 +98,36 @@ class CardAccessTest extends TestCase
         $this->get('/ash')
             ->assertOk()
             ->assertInertia(fn ($page) => $page->component('public-card'));
+    }
+
+    /**
+     * The home page shows four real trainers beside its link to the gallery, and a hidden owner
+     * must never be one of them.
+     *
+     * That prop puts a stranger's face and handle on the busiest page in the app, so "is_public is
+     * respected" is worth pinning rather than reading off the query. The cache is cleared first
+     * because the pool is cached for an hour and the rest of the suite may have filled it.
+     */
+    public function test_the_landing_trainers_never_include_a_private_owner()
+    {
+        Cache::forget(LandingController::TRAINERS_KEY);
+
+        foreach (['shown', 'hidden'] as $login) {
+            Profile::create([
+                'login' => $login,
+                'github_json' => ['login' => $login, 'name' => $login, 'avatar' => 'https://avatars.example/'.$login],
+                'card_json' => ['ai' => null],
+                'fetched_at' => 0,
+            ]);
+        }
+        User::factory()->create(['slug' => 'hidden', 'github_login' => 'Hidden', 'is_public' => false]);
+
+        $this->get('/')->assertOk()->assertInertia(function ($page) {
+            $logins = array_column($page->toArray()['props']['trainers'], 'login');
+
+            $this->assertContains('shown', $logins);
+            $this->assertNotContains('hidden', $logins, 'a private owner was put on the home page');
+        });
     }
 
     public function test_only_admins_can_restyle_a_card()

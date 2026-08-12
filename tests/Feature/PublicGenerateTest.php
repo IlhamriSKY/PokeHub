@@ -2,8 +2,11 @@
 
 namespace Tests\Feature;
 
+use App\Models\CardAsset;
 use App\Models\Profile;
 use App\Models\User;
+use App\Services\GithubCardService;
+use Database\Seeders\CardAssetSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Laravel\Socialite\Contracts\Provider;
@@ -235,5 +238,32 @@ class PublicGenerateTest extends TestCase
         $card = User::where('github_login', 'torvalds')->first()->card;
         $this->assertSame('secret', $card['rarity']);
         $this->assertSame('tcg-gen', $card['axes']['generation']);
+    }
+
+    /**
+     * A generated card picks its own generation, and the three sets get used.
+     *
+     * The axes blob used to be empty, which meant DEFAULT_AXES - and that pins the generation to
+     * 1-gen, so every generated card on the site was a Base Set card. With the bottom two rarity
+     * tiers holding three presets between them, that left almost every card looking like the same
+     * three. So this asserts BOTH halves: the slug is one the table actually enables, and forty
+     * logins do not all land on one set.
+     */
+    public function test_a_generated_card_gets_a_generation_of_its_own()
+    {
+        $this->seed(CardAssetSeeder::class);
+        $service = app(GithubCardService::class);
+        $enabled = CardAsset::where('category', 'generation')->where('enabled', true)->pluck('slug')->all();
+
+        $seen = [];
+        foreach (range(1, 40) as $i) {
+            $gen = $service->axesFor("dev{$i}")['generation'];
+            $this->assertContains($gen, $enabled, 'handed out a generation the table does not enable');
+            $seen[$gen] = true;
+        }
+
+        $this->assertCount(count($enabled), $seen, 'every generated card landed on the same set(s)');
+        // Same login, same card - the pick is a hash, not a roll of the dice.
+        $this->assertSame($service->axesFor('torvalds'), $service->axesFor('TORVALDS'));
     }
 }

@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button';
 import { useAppearance } from '@/hooks/use-appearance';
 import { resolveOverrides, type Axes } from '@/lib/cardModel';
 import { useCardOptions, type CardOptions } from '@/lib/options';
-import { raritiesFromOptions, rarityOf, type Profile, type Rarity } from '@/lib/rarities';
+import { avatarUrl, raritiesFromOptions, rarityOf, type Profile, type Rarity } from '@/lib/rarities';
 import { type SharedData } from '@/types';
 import { Head, Link, usePage } from '@inertiajs/react';
 import { ArrowRight, ChevronDown, Moon, Sparkles, Sun } from 'lucide-react';
@@ -300,7 +300,18 @@ function ZoomOverlay({ entry, rarities, options, onClose }: { entry: ShowcaseEnt
     );
 }
 
-export default function Landing({ showcase, showLogin, status }: { showcase: ShowcaseEntry[]; showLogin?: boolean; status?: string }) {
+export default function Landing({
+    showcase,
+    trainers = [],
+    showLogin,
+    status,
+}: {
+    showcase: ShowcaseEntry[];
+    /** Random public generated cards, for the faces on the gallery link (LandingController::trainers). */
+    trainers?: Pick<Profile, 'login' | 'avatar'>[];
+    showLogin?: boolean;
+    status?: string;
+}) {
     const { auth } = usePage<SharedData>().props;
     const { options } = useCardOptions();
     const rarities = useMemo(() => raritiesFromOptions(options), [options]);
@@ -417,13 +428,52 @@ export default function Landing({ showcase, showLogin, status }: { showcase: Sho
                                 something - on a card, to claim it. */}
                             <GenerateForm />
 
-                            {/* A real control, not a line of underlined text. The search box above
-                                is the page's primary action, so this one has to read as the button
-                                that lost the argument rather than as prose that happens to be
-                                clickable - outline keeps the hierarchy without giving up the
-                                target size. Still a plain anchor: it is a hash jump, not a visit. */}
-                            <div className="mt-5">
-                                <Button asChild variant="outline">
+                            {/* Two ways on from the search box, and the gallery leads. It used to be
+                                the second button on the closing panel, which is the wrong place for
+                                it: by then the visitor has scrolled the whole page without ever
+                                being shown that other people's cards exist.
+
+                                The four faces are what make it worth pressing. They are the same
+                                trainers fanned out beside this column, so the row SHOWS what is
+                                behind the click instead of describing it - and a stack of real
+                                avatars is the one thing on this page that says "other people are
+                                already in here".
+
+                                The sign-in is deliberately not in the label. /cards is behind auth
+                                and stores itself as the intended URL, so the trip through GitHub
+                                lands on the gallery - but "sign in to browse" is a toll, and the
+                                cards are the reason. Same argument the hero already makes about not
+                                asking for an account before anyone has seen a card.
+
+                                "See how it works" keeps a real control and a real target - the
+                                objection it was written against was underlined prose, not a quieter
+                                variant - but it steps back to ghost so the gallery wins the eye.
+                                Still a plain anchor: it is a hash jump, not a visit. */}
+                            <div className="mt-6 flex flex-col items-center justify-center gap-3 sm:flex-row">
+                                <Link
+                                    href="/cards"
+                                    className="border-border/70 bg-card hover:border-primary/60 hover:bg-accent focus-visible:ring-ring group inline-flex h-12 items-center gap-3 rounded-full border pr-5 pl-3 shadow-sm transition-colors focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
+                                >
+                                    {/* Real trainers, drawn fresh on every visit. The showcase is the
+                                        fallback for a site with nothing generated yet - and only
+                                        that, because the four showcase cards are already fanned out
+                                        either side of this column, so using them here would show the
+                                        same four faces twice and say nothing. */}
+                                    <span className="flex -space-x-2.5">
+                                        {(trainers.length ? trainers : showcase.slice(0, 4).map((s) => s.profile)).map((t) => (
+                                            <img
+                                                key={t.login}
+                                                src={avatarUrl(t, 48)}
+                                                alt=""
+                                                loading="lazy"
+                                                className="border-card h-7 w-7 rounded-full border-2 object-cover"
+                                            />
+                                        ))}
+                                    </span>
+                                    <span className="text-sm font-semibold">{'Browse trainer cards'}</span>
+                                    <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+                                </Link>
+                                <Button asChild variant="ghost" className="h-12">
                                     <a href="#how">
                                         {'See how it works'}
                                         <ArrowRight />
@@ -590,6 +640,27 @@ export default function Landing({ showcase, showLogin, status }: { showcase: Sho
                             </li>
                         ))}
                     </ol>
+
+                    {/* The walkthrough, under the four steps rather than over them: the steps answer
+                        "what happens" at a glance and the video is the long version for whoever
+                        wants it, so the section still works for someone who never presses play.
+
+                        `loading="lazy"` because the YouTube player is about a megabyte of script and
+                        this sits far below the fold - the cards at the top must not wait on it. The
+                        nocookie host for the same reason the page ends on a "Public Data Only"
+                        badge: nothing else here follows anyone around. The 16:9 box comes from
+                        aspect-video, so the frame cannot letterbox at any width. */}
+                    <div className="bg-card mt-8 overflow-hidden rounded-xl border">
+                        <iframe
+                            className="aspect-video w-full"
+                            src="https://www.youtube-nocookie.com/embed/71vvcPnOfsk"
+                            title="Turn any GitHub profile into a holographic trading card"
+                            loading="lazy"
+                            referrerPolicy="strict-origin-when-cross-origin"
+                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                            allowFullScreen
+                        />
+                    </div>
                 </div>
             </section>
 
@@ -644,27 +715,15 @@ export default function Landing({ showcase, showLogin, status }: { showcase: Sho
                             ? 'Open your dashboard to restyle it, publish it, or copy the README embed.'
                             : 'Anyone can generate your card up there, and someone may already have. Signing in makes it yours - regenerate it, restyle it, or make it private.'}
                     </p>
-                    {/* Two buttons on one row, not a button with a text link hanging under it: the
-                        gallery is the other half of what an account is for, and underlined prose
-                        beneath a solid button reads as a footnote rather than as the second of two
-                        choices. Outline, so the primary still wins the eye; the same h-12, so the
-                        pair sits on one baseline.
-
-                        The gallery is behind the sign-in, which is what makes this a second reason
-                        for a guest to press the button beside it rather than a link that dead-ends:
-                        `auth` stores /cards as the intended URL, so the trip through GitHub lands
-                        them there. Stacked below sm, where two of these will not share a row. */}
-                    <div className="mt-7 flex flex-col items-stretch justify-center gap-3 sm:flex-row sm:items-center">
+                    {/* One button now. The gallery used to sit beside it as the second of two
+                        choices, and it has moved to the hero - a visitor should meet other
+                        trainers' cards before scrolling the whole page, not after. What is left
+                        here is the single thing this panel is actually for. */}
+                    <div className="mt-7 flex justify-center">
                         <Button asChild size="lg" className="h-12 gap-2.5 px-7 text-base">
                             <Link href={ctaHref} {...ctaProps}>
                                 {!signedIn && <GithubMark />}
                                 {signedIn ? 'Go to dashboard' : 'Continue with GitHub'}
-                            </Link>
-                        </Button>
-                        <Button asChild size="lg" variant="outline" className="h-12 gap-2.5 px-7 text-base">
-                            <Link href="/cards">
-                                {'Browse cards from other trainers'}
-                                <ArrowRight />
                             </Link>
                         </Button>
                     </div>

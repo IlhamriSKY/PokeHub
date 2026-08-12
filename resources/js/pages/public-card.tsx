@@ -9,7 +9,7 @@ import { langType, raritiesFromOptions, rarityOf, typeColor, type Profile } from
 import { type SharedData } from '@/types';
 import { Head, Link, usePage } from '@inertiajs/react';
 import { ArrowRight, Check, Download, Link2, Loader2, MapPin } from 'lucide-react';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 type CardData = { profile: Profile; rarity: string; axes: Axes };
 
@@ -161,6 +161,28 @@ export default function PublicCard({ owner, card }: { owner: { name: string; slu
     // other casing of the login does not propagate.
     const shareUrl = encodeURIComponent(`${origin}/${owner.slug}`);
     const shareText = encodeURIComponent(`${owner.name} as a Pokémon card`);
+
+    /*
+     * Warm the link preview.
+     *
+     * og:image points at `/{slug}.png`, and the first request for one renders the card in headless
+     * Chromium: measured 7.4-9.2 seconds cold, 0.36 warm. Every scraper that fetches an og:image -
+     * WhatsApp, X, Slack, Discord, Telegram - gives up long before that, so the FIRST time a card
+     * was shared the preview came back with no picture, and only worked afterwards once someone had
+     * pulled the image by hand. That is the "OG sometimes does not show" bug, and it is a race, not
+     * a missing tag: the tags themselves have always been in the server-rendered HTML.
+     *
+     * A scraper never runs this - it does not execute the bundle. That is the point. The card page
+     * is what a person opens BEFORE they paste the link anywhere, so warming it here means the file
+     * is already on disk by the time anything scrapes it.
+     *
+     * HEAD, not GET: the controller still renders and caches, and the body is thrown away, so this
+     * costs the visitor nothing on a page that already carries a full card. Failures are ignored on
+     * purpose - it is a warm-up, and the throttle refusing it is not something to report.
+     */
+    useEffect(() => {
+        fetch(`/${owner.slug}.png`, { method: 'HEAD' }).catch(() => {});
+    }, [owner.slug]);
 
     const savePng = async () => {
         setSaving(true);

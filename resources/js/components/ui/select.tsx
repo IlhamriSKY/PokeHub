@@ -4,7 +4,55 @@ import * as React from 'react';
 
 import { cn } from '@/lib/utils';
 
-const Select = SelectPrimitive.Root;
+/**
+ * When the window was last resized.
+ *
+ * Registered at module load, which is what makes it work: Radix adds its own resize listener when a
+ * menu opens, so ours is always the earlier one and the stamp is already fresh by the time Radix
+ * asks to close. See {@link Select}.
+ */
+let lastResize = -Infinity;
+if (typeof window !== 'undefined') {
+    window.addEventListener('resize', () => {
+        lastResize = performance.now();
+    });
+}
+
+/** How long after a resize a close is treated as that resize's doing. The two are the same tick. */
+const RESIZE_GRACE_MS = 50;
+
+/**
+ * Radix's Select, minus its habit of closing itself on `window.resize`.
+ *
+ * That listener (react-select's SelectContentImpl: `window.addEventListener('resize', close)`) is
+ * why every dropdown shut by itself on a phone. The on-screen keyboard IS a resize there, so the
+ * filter box below could never be used: the menu vanished the instant the keyboard slid up. Radix
+ * Select is also the ONLY @radix-ui package carrying that listener, which is why the menus built on
+ * DropdownMenu were fine and every one of these was not.
+ *
+ * So the close is what gives, not the filter box - thirty-one rarities is not a list anyone should
+ * have to scroll blind. A resize cannot leave the menu stranded anyway: it is positioned by Floating
+ * UI, which repositions it on that same resize.
+ *
+ * The Root has to be CONTROLLED for this to bite. Uncontrolled, Radix keeps the open state itself
+ * and `onOpenChange` is only a notification - returning early from it would close the menu anyway.
+ */
+function Select({ open, defaultOpen, onOpenChange, ...props }: React.ComponentProps<typeof SelectPrimitive.Root>) {
+    const [self, setSelf] = React.useState(defaultOpen ?? false);
+    const isOpen = open ?? self;
+
+    return (
+        <SelectPrimitive.Root
+            {...props}
+            open={isOpen}
+            onOpenChange={(next) => {
+                if (!next && performance.now() - lastResize < RESIZE_GRACE_MS) return;
+                if (open === undefined) setSelf(next);
+                onOpenChange?.(next);
+            }}
+        />
+    );
+}
 
 const SelectGroup = SelectPrimitive.Group;
 
@@ -61,6 +109,19 @@ SelectScrollDownButton.displayName = SelectPrimitive.ScrollDownButton.displayNam
  * and none of the call sites changed.
  */
 const FilterContext = React.createContext('');
+
+/**
+ * Does focusing an input on this device raise an on-screen keyboard?
+ *
+ * It gates the filter box's AUTOFOCUS only - the box itself is on every dropdown, phone included
+ * (see {@link Select} for what used to make that impossible). Grabbing focus on open would raise
+ * the keyboard over the options before anyone asked to search, so a phone opens on the list and
+ * takes the keyboard when the box is tapped.
+ *
+ * Read once at module load rather than through a hook: a device does not grow a mouse mid-session,
+ * and Select mounts its content only while open, so there is no server markup to mismatch.
+ */
+const TOUCH_KEYBOARD = typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches === true;
 
 /** A node's visible text, so an item can be matched on what the user actually reads. */
 function text(node: React.ReactNode): string {
@@ -146,9 +207,11 @@ const SelectContent = React.forwardRef<
                 <Search className="text-muted-foreground h-3.5 w-3.5 shrink-0" />
                 <input
                     // Radix owns keyboard focus inside an open Select and steers letters into its
-                    // own typeahead. Autofocusing on the next frame wins that race.
+                    // own typeahead. Autofocusing on the next frame wins that race. Not on a phone,
+                    // where taking focus means the keyboard covers the options nobody has asked to
+                    // filter yet - see TOUCH_KEYBOARD.
                     ref={(el) => {
-                        if (el) requestAnimationFrame(() => el.focus());
+                        if (el && !TOUCH_KEYBOARD) requestAnimationFrame(() => el.focus());
                     }}
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
