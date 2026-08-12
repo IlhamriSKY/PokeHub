@@ -20,9 +20,17 @@ php artisan migrate --seed
 ```
 
 Set `DB_*` in `.env` and you are running. Everything else is optional: without an AI endpoint the
-cards render with real stats but no flavour text, which is fine for most work. The card typefaces
-are commercial and not in the repository, so text renders in Cabin instead. That is expected, and
-[`public/fonts/pcg/README.md`](public/fonts/pcg/README.md) explains it.
+cards render with real stats but no flavour text, which is fine for most work.
+
+**Your cards will render without their artwork, and that is expected.** The frames, foils and holo
+textures are not the project author's to license, so they are not in this repository. See
+[`public/img/README.md`](public/img/README.md). The commercial card typefaces are absent for the
+same reason and fall back to Cabin, see [`public/fonts/pcg/README.md`](public/fonts/pcg/README.md).
+
+Nothing fails and no test depends on either. Everything the project actually computes still works
+untouched: the stats, the element, the rarity, the AI text and the layout. That is most of what
+there is to change. If a change genuinely needs the real frames in front of you, say so on the
+issue rather than guessing.
 
 Then `npm run dev` and `php artisan serve`.
 

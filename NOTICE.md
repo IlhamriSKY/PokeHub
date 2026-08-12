@@ -22,24 +22,31 @@ copyleft licence, so a work that includes and distributes it must carry the same
 | What | Where | Source | Licence |
 |---|---|---|---|
 | Holographic foil engine | `public/holo.css`, `resources/css/card.css` | [simeydotme/pokemon-cards-css](https://github.com/simeydotme/pokemon-cards-css), [pokemon-cards-151](https://github.com/simeydotme/pokemon-cards-151) | GPL-3.0 |
-| Foil masks and holo textures | `public/img/foils/`, and the texture files directly in `public/img/` (`grain`, `glitter`, `cosmos-*`, `illusion*`, `geometric`, `ancient`, `trainerbg`) | as above | GPL-3.0 |
+| Foil masks and holo textures | **not in this repository**: `public/img/foils/`, `public/img/151/` and the loose textures (`grain`, `glitter`, `cosmos-*`, `illusion*`, `geometric`, `ancient`, `trainerbg`, `vmaxbg`) | as above | GPL-3.0 |
 | Type emblem icons | `public/img/types/` | [duiker101/pokemon-type-svg-icons](https://github.com/duiker101/pokemon-type-svg-icons) | MIT |
 | Cabin typeface | `public/fonts/cabin-*.woff2` | [Google Fonts](https://fonts.google.com/specimen/Cabin) | SIL OFL 1.1 |
 | Laravel framework and PHP packages | `vendor/` | see `composer.lock` | mostly MIT |
 | JavaScript packages | `node_modules/` | see `package-lock.json` | mostly MIT |
 
-## Card frame artwork
+## Card artwork is not in this repository
 
-`public/img/pcg/` contains card frames, stamps, tags, badges and effect layers obtained from
-[pokecardgenerator.com](https://pokecardgenerator.com). These are **not** covered by this project's
-licence and are **not** the project author's to license.
+**No card frames, foil masks or holo textures are distributed here.** `public/img/` ships the MIT
+type emblems and nothing else; see [`public/img/README.md`](public/img/README.md).
 
-They derive from Pokémon Trading Card Game designs, which are the property of Nintendo, Creatures
-Inc., GAME FREAK inc. and The Pokémon Company. They are included here for non-commercial fan use so
-that the project renders as intended.
+The frames, stamps, tags, badges and effect layers come from
+[pokecardgenerator.com](https://pokecardgenerator.com) and derive from Pokémon Trading Card Game
+designs, which are the property of Nintendo, Creatures Inc., GAME FREAK inc. and The Pokémon
+Company. They are **not** the project author's to license, so putting them under this repository's
+GPL-3.0 would be claiming a right that does not exist. This project therefore does not distribute
+them and grants you no rights to them.
 
-If you fork this repository, that artwork does not become yours, and this project grants you no
-rights to it. If you intend to use PokeHub for anything commercial, remove that directory first.
+The simeydotme foil masks and textures are GPL-3.0 and could have stayed. They are held back with
+the rest only so that restoring the card's appearance is one step rather than one step and a list
+of exceptions. Their licence is unchanged and their attribution is in the table above.
+
+Cloning this repository gives you a working application whose cards render without their artwork.
+Nothing fails; the frames are simply missing. What you build on top is yours, under GPL-3.0, and
+carries no claim over anyone's card designs.
 
 ## Fonts
 

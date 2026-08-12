@@ -1,18 +1,51 @@
 # Deploying PokeHub
 
-Standard Laravel + Inertia deploy, with **one unusual requirement**: the embeddable card images
+Standard Laravel + Inertia deploy, with **two unusual requirements**: the card artwork is not in
+this repository and has to be fetched separately (§1), and the embeddable card images
 (`/{slug}.gif`, `.svg` and `.png`) are screenshots of the real card page, so the server needs Node
-and Chromium. Nothing else on the site does.
+and Chromium (§3).
 
 ---
 
-## 1. Baseline
+## 1. Card artwork
+
+Frames, foil masks and holo textures are not distributed with this repository, because they are not
+the project author's to license. See [NOTICE.md](NOTICE.md) and
+[`public/img/README.md`](public/img/README.md).
+
+The site runs without them and nothing fails, so this step is easy to skip by accident and hard to
+notice afterwards: every card just loses its frame. Copy your own artwork tree into `public/img/`
+before going live, keeping the paths `resources/css/pcg.css` and `public/holo.css` expect, then
+check the files actually arrived:
+
+```bash
+find public/img/pcg -type f | wc -l    # expect 188
+find public/img/foils -type f | wc -l  # expect 25
+ls public/img/*.png public/img/*.webp public/img/*.jpg | wc -l   # expect 11
+test -f public/og.png && echo "og image present"
+```
+
+`public/og.png` is in that list for the same reason: it is a capture of the hero, so it carries the
+card frames baked into it. `Seo.php` points every page's `og:image` at `/og.png` and hard codes its
+2560x1344 dimensions, so if you replace it, keep those dimensions or update `Seo::make()` to match.
+A scraper that is handed a different aspect than the tag promises letterboxes the preview.
+
+**Make your deploy script re-run that copy, or make it leave `public/img/` alone.** A deploy that
+wipes the checkout and re-clones takes the artwork with it, and again, the only symptom is missing
+frames. These are static files, so replacing them needs no redeploy and no cache clear.
+
+The `.gitignore` rules cover every path they land on, so restored files stay untracked and cannot
+be committed back.
+
+---
+
+## 2. Baseline
 
 | | |
 |---|---|
 | PHP | 8.2+ with `pdo_mysql`, `mbstring`, `curl`, `fileinfo` |
 | Composer | 2.x |
-| Node | 20+ (assets, and the card capture; see §2) |
+| Node | 20+ (assets, and the card capture; see §3) |
 | MySQL | 8.0+ |
 
 ```bash
@@ -47,7 +80,7 @@ perfectly healthy either way:
 
 ---
 
-## 2. The card images (`/{slug}.gif`, `.svg`, `.png`)
+## 3. The card images (`/{slug}.gif`, `.svg`, `.png`)
 
 ```markdown
 ![my card](https://your-host/torvalds.gif)   animated, foil moving
@@ -78,7 +111,7 @@ sudo apt-get install -y imagemagick
 ```
 
 ImageMagick earns its line because of how it fails. `.png` is the `og:image` every card page points
-at, and WhatsApp drops a preview image over roughly 300KB — the raw capture is ~1MB. `CardCapture`
+at, and WhatsApp drops a preview image over roughly 300KB, where the raw capture is ~1MB. `CardCapture`
 palettises it down to ~236KB, and without the binary it simply skips that step: no error, no log
 entry, every card still serves, and shared links quietly preview as a bare title on one chat app.
 It looks for `magick` first and falls back to `convert`, so either ImageMagick 6 or 7 works.
@@ -131,7 +164,7 @@ fallback: every format needs the same browser, so a redirect between them would 
 
 ---
 
-## 3. What runs where
+## 4. What runs where
 
 | Route | Needs | Cost | Cached |
 |---|---|---|---|
@@ -152,7 +185,7 @@ behaves exactly as it did before the cache existed.
 
 ---
 
-## 4. Security note
+## 5. Security note
 
 `npm audit` currently reports vulnerabilities in the Puppeteer dependency tree. They are
 devDependencies and nothing ships to the browser, but Chromium **does** run server-side on request,

@@ -20,10 +20,29 @@
 /storage/pail
 /vendor
 auth.json
+# Card artwork: frames, foils, holo textures. Not distributed with this repository at all. Most of
+# it derives from Pokemon Trading Card Game designs and is not this project's to license under the
+# GPL it ships under, so it cannot travel with a public repo. See NOTICE.md, and
+# public/img/README.md for what is missing and how to supply it.
+#
+# Ignore everything under public/img, then re-include only what IS ours to publish. A directory has
+# to be re-included before anything inside it can be: git will not look into an excluded directory,
+# so `!/public/img/foils/README.md` alone would never match.
+/public/img/*
+!/public/img/README.md
+!/public/img/types/
+!/public/img/foils/
+/public/img/foils/*
+!/public/img/foils/README.md
+!/public/img/uploads/
 # Admin-uploaded card art: user content, not source. The .htaccess beside it IS source, since it is
 # the lock that stops anything in this tree being executed, so a deploy without it is an RCE hole.
 /public/img/uploads/*
 !/public/img/uploads/.htaccess
+# The link-preview image, which is a capture of the hero and so carries the same card frames baked
+# into it as a raster. Out for the same reason they are. Seo.php still points at /og.png and hard
+# codes its dimensions, so a deploy supplies the file; without it, shares preview as a bare title.
+/public/og.png
 # Gill Sans and NeoGram are commercial typefaces this project has no right to redistribute. The
 # card falls back to Cabin without them; drop your own licensed copies here for exact parity.
 /public/fonts/pcg/*

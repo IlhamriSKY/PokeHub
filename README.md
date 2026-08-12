@@ -103,9 +103,11 @@ security problem, see [SECURITY.md](SECURITY.md) rather than opening a public is
 
 The code is GPL-3.0-or-later. See [LICENSE](LICENSE).
 
-The card frames, the holographic foil and the typefaces are **not** the project author's work and
-are not all covered by that licence. [NOTICE.md](NOTICE.md) records what comes from where, what you
-may redistribute, and how to request a takedown.
+**The card artwork is not in this repository.** Frames, foil masks, holo textures and the card
+typefaces are not the project author's work and are not all licensable by it, so they are not
+distributed here. A clone runs and every test passes; the cards simply render without their frames.
+[`public/img/README.md`](public/img/README.md) explains what is missing and how to supply it, and
+[NOTICE.md](NOTICE.md) records what comes from where and how to request a takedown.
 
 PokeHub is an unofficial fan project with no affiliation with Nintendo, Creatures Inc., GAME FREAK
 inc. or The Pokémon Company, and none with GitHub. Nothing here is for sale.
