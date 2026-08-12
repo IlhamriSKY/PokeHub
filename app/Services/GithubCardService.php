@@ -139,7 +139,7 @@ class GithubCardService
                     // `rarity` and `axes` are stored, not derived on render, so a generated card is
                     // a card like any other: the admin lab can restyle it, and the gallery can
                     // filter on it in SQL instead of computing a tier per row in PHP.
-                    'card_json' => ['ai' => $lore, 'rarity' => $this->rarityFor($login, $profile), 'axes' => []],
+                    'card_json' => ['ai' => $lore, 'rarity' => $this->rarityFor($login, $profile), 'axes' => $this->axesFor($login)],
                     'fetched_at' => time(),
                 ]
             ),
@@ -484,6 +484,37 @@ class GithubCardService
 
         return $this->pickInTier($this->rarityTier($this->rarityScore($profile)), $key)
             ?? $this->cfg['default_rarity'];
+    }
+
+    /**
+     * The style axes a generated card is born with.
+     *
+     * This used to be `[]`, which is not "no styling" but "every default" - and DEFAULT_AXES pins
+     * the generation to 1-gen, so every generated card on the site was a Base Set card. That left
+     * the rarity preset as the ONLY thing telling two generated cards apart, and it cannot carry
+     * that alone: the bottom two tiers hold three presets between them (see pickInTier), while
+     * roughly three quarters of real accounts score into them. Hence a wall of Poke Ball Holo.
+     *
+     * The generation is the axis that buys the most for the least. The three sets are three
+     * completely different frames, and every dependent axis already narrows itself to what the
+     * chosen one ships - elementsForGen, subtypesForGen, the per-generation variant rows,
+     * supportsChrome - so switching it cannot produce a combination the renderer has no art for.
+     *
+     * Read from the table rather than hardcoded, so a generation an admin disables stops being
+     * handed out. Ordered by SLUG, not by sort_order: sort_order is drag-to-reorder in the admin UI
+     * and reordering it would silently deal every login a different card.
+     *
+     * Hashed off the login exactly like the rarity preset - stable, so a login keeps its card
+     * across reloads - but on its own salt, so the generation and the rarity do not move in
+     * lockstep and produce only three combinations instead of nine.
+     *
+     * @return array<string, string>
+     */
+    public function axesFor(string $login): array
+    {
+        $gens = CardAsset::where('category', 'generation')->where('enabled', true)->orderBy('slug')->pluck('slug')->all();
+
+        return $gens ? ['generation' => $gens[crc32('gen:'.strtolower($login)) % count($gens)]] : [];
     }
 
     /**
