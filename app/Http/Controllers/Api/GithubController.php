@@ -45,22 +45,26 @@ class GithubController extends Controller
 
             [$user, $err, $code] = $svc->ghGet('https://api.github.com/users/'.rawurlencode($login));
 
+            // Whether there is a usable cached copy to fall back on. Read once, before the fetch
+            // below can overwrite $github, and it decides both failure branches: a stale card
+            // always beats an error here, so a refetch can never leave the lab with less than it
+            // opened with.
+            $cached = is_array($github) && ! empty($github['login']);
+
             if ($err !== null || ! is_array($user)) {
-                if (is_array($github) && ! empty($github['login'])) {
-                    // serve stale cache on GitHub failure
-                } elseif ($code === 404) {
-                    return $this->fail(404, 'GitHub user not found');
-                } elseif ($code === 403 || $code === 429) {
-                    return $this->fail(429, 'GitHub rate limit reached. Set a GITHUB_TOKEN in .env to raise it from 60 to 5000 requests/hour.');
-                } else {
-                    return $this->fail(502, 'GitHub API error');
+                if (! $cached) {
+                    return match (true) {
+                        $code === 404 => $this->fail(404, 'GitHub user not found'),
+                        $code === 403 || $code === 429 => $this->fail(429, 'GitHub rate limit reached. Set a GITHUB_TOKEN in .env to raise it from 60 to 5000 requests/hour.'),
+                        default => $this->fail(502, 'GitHub API error'),
+                    };
                 }
             } else {
                 [$repos, $repoErr] = $svc->ghGet('https://api.github.com/users/'.rawurlencode($login).'/repos?per_page=100&sort=pushed');
 
-                if ($repoErr !== null && is_array($github) && ! empty($github['login'])) {
-                    // keep stale $github/$card on partial failure
-                } else {
+                // A repo failure on a login we already hold: keep what is cached rather than
+                // replace a complete card with one that would report zero stars and no languages.
+                if ($repoErr === null || ! $cached) {
                     // Any already-cached lore survives a failed regeneration below.
                     $prevAi = is_array($card) ? ($card['ai'] ?? null) : null;
                     $github = $svc->buildProfile($user, is_array($repos) ? $repos : []);
@@ -95,8 +99,12 @@ class GithubController extends Controller
         $data['rarity'] = $rarity;
         $data['card'] = ['ai' => $lore, 'rarity' => $rarity];
 
+        // `private`, not `public`: this route reads the session to decide whether the caller may
+        // generate, so it stays in the web group and every response carries a `Set-Cookie`. Inviting
+        // a shared cache to store one would be inviting it to hand somebody else's session to the
+        // next caller. The browser cache is all this needs - it only debounces the lab's typing.
         return response()->json($data, 200, [
-            'Cache-Control' => 'public, max-age=60',
+            'Cache-Control' => 'private, max-age=60',
         ], JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE);
     }
 

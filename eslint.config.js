@@ -48,7 +48,11 @@ export default [
         },
     },
     {
-        ignores: ['vendor', 'node_modules', 'public', 'bootstrap/ssr', 'tailwind.config.js'],
+        // `check.mjs` is the bundled card-model self-check that CONTRIBUTING and CI both build into
+        // the project root. Flat config does not read .gitignore, so ignoring it there is not
+        // enough: without this, running the two checks in the order CONTRIBUTING lists them makes
+        // the second fail on 236 errors inside the first one's output.
+        ignores: ['vendor', 'node_modules', 'public', 'bootstrap/ssr', 'tailwind.config.js', 'check.mjs'],
     },
     prettier, // Turn off all rules that might conflict with Prettier
 ];

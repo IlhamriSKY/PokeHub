@@ -1,9 +1,12 @@
 <?php
 
 /**
- * PokeHub card-generation config. Ported from the original api/config.php.
- * Secrets come from .env; the rarity map is edited here (or, once the admin
- * dashboard lands, per-profile in the database).
+ * PokeHub card-generation config.
+ *
+ * Secrets come from .env and never from this file, which is committed. Everything a running site
+ * actually tunes - frames, rarity presets, effects - lives in the `card_assets` table and is edited
+ * from the admin card lab at /admin/lab; what is left here is the handful of values that have to
+ * exist before the database does.
  */
 return [
 
@@ -55,12 +58,15 @@ return [
      */
     'rarity_auto_exclude' => [],
 
-    // Explicit per-login override, which beats the derived tier. The landing showcase does NOT
-    // live here any more - each showcase card carries its own rarity in the `showcase_cards`
-    // table, so pinning those logins twice would just be two places to disagree.
-    'rarity_map' => [
-        'ilhamrisky' => 'hyper',
-        'pewdiepie-archdaemon' => 'secret',
-        'theprimeagen' => 'vmax',
-    ],
+    /*
+     * Explicit per-login override, which beats the derived tier. The landing showcase does NOT live
+     * here any more - each showcase card carries its own rarity in the `showcase_cards` table, so
+     * pinning those logins twice would just be two places to disagree.
+     *
+     * Empty by default. This is an editorial thumb on the scale for one deployment's own handles,
+     * so shipping entries here would hand every clone of the project somebody else's favourites:
+     *
+     *     'torvalds' => 'hyper',
+     */
+    'rarity_map' => [],
 ];

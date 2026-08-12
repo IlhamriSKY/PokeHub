@@ -280,6 +280,8 @@ class AdminController extends Controller
                 'card' => CardPayload::slim($g['card']),
             ]));
 
+        $generatedTotal = GeneratedCards::all()->count();
+
         $page = LengthAwarePaginator::resolveCurrentPage();
         $cards = new LengthAwarePaginator(
             $rows->forPage($page, self::CARDS_PER_PAGE)->values(),
@@ -296,10 +298,13 @@ class AdminController extends Controller
             'cards' => $cards,
             'filters' => ['q' => $search, 'filter' => $only, 'rarity' => $rarity],
             // Counted across both sources, or the tab labels contradict the table under them.
+            // Both tabs add the SAME unfiltered generated count, so it is read once: every call
+            // reads the whole profiles table plus two plucks, and this was doing it twice for one
+            // number. The filtered call above is a third read and a genuinely different question.
             'totals' => [
-                'all' => User::whereNotNull('card')->count() + GeneratedCards::all()->count(),
+                'all' => User::whereNotNull('card')->count() + $generatedTotal,
                 'public' => User::whereNotNull('card')->where('is_public', true)->whereNotNull('slug')->count()
-                    + GeneratedCards::all()->count(),
+                    + $generatedTotal,
             ],
         ]);
     }

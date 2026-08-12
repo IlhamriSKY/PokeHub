@@ -56,7 +56,9 @@ class RolesAndPermissionsSeeder extends Seeder
          * an account whose primary address is ADMIN_EMAIL, which `email_verified_at` below lets
          * the callback match. An existing admin's password is never overwritten.
          */
-        $adminEmail = env('ADMIN_EMAIL', 'admin@pokehub.dev');
+        // example.com is the RFC 2606 documentation domain, so an install that forgets to set
+        // ADMIN_EMAIL parks the row somewhere that provably belongs to nobody.
+        $adminEmail = env('ADMIN_EMAIL', 'admin@example.com');
         $existing = User::where('email', $adminEmail)->first();
 
         $adminUser = User::updateOrCreate(

@@ -1,6 +1,14 @@
 {
     "name": "pokehub",
     "private": true,
+    "description": "Turn any public GitHub profile into a holographic Pokemon-style trading card.",
+    "license": "GPL-3.0-or-later",
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/IlhamriSKY/PokeHub.git"
+    },
+    "homepage": "https://github.com/IlhamriSKY/PokeHub",
+    "bugs": "https://github.com/IlhamriSKY/PokeHub/issues",
     "type": "module",
     "scripts": {
         "build": "vite build",

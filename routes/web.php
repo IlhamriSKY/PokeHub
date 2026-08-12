@@ -23,35 +23,49 @@ use Illuminate\Support\Facades\Route;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
 use Inertia\Inertia;
 
+/*
+ * The session and Inertia middleware, dropped from the routes that answer with a cached asset
+ * rather than a page. Everything in this file is in the `web` group because the file is, and every
+ * one of these costs something on a route that never reads a session.
+ *
+ * StartSession is a read AND a write against the database session table - on each of the four faces
+ * a landing page asks for - and it plus ValidateCsrfToken attach two `Set-Cookie` headers.
+ * That is two separate problems for a cached route: a shared cache will not honour the `s-maxage`
+ * these routes send while a `Set-Cookie` is on the response, and one that is configured to store it
+ * anyway would be keeping somebody's session cookie next to a public body. `Cache-Control: public`
+ * is only honest once the cookie is gone. HandleInertiaRequests adds a `Vary: X-Inertia` that
+ * splits the cache again.
+ *
+ * SecurityHeaders and SubstituteBindings stay: `nosniff` matters more here than anywhere.
+ *
+ * NOT applied to `api/github`, which is the one of these that does read the session - it checks for
+ * the admin role before it will generate. That route answers `private` instead.
+ */
+$stateless = [
+    EncryptCookies::class,
+    AddQueuedCookiesToResponse::class,
+    StartSession::class,
+    ShareErrorsFromSession::class,
+    ValidateCsrfToken::class,
+    HandleInertiaRequests::class,
+    AddLinkHeadersForPreloadedAssets::class,
+];
+
 // Public: cached reads keep shared /{slug} links working for logged-out visitors. The generation
-// branch inside the controller is the gated part.
+// branch inside the controller is the gated part, and is why this one keeps its session.
 Route::get('api/github', [GithubController::class, 'show'])->middleware('throttle:30,1');
 // Throttled like every other public endpoint, since this dumps the whole enabled asset table and
 // a browser cache does nothing to a client that ignores it.
-Route::get('api/options', [OptionsController::class, 'index'])->middleware('throttle:60,1');
+Route::get('api/options', [OptionsController::class, 'index'])
+    ->middleware('throttle:60,1')
+    ->withoutMiddleware($stateless);
 
 // The card's face, cached on our own disk (AvatarCache). Two segments, so it cannot collide with
 // the `{slug}` catch-all at the bottom of this file, and public because every card page needs it.
-//
-// Stripped back to a static-file handler. Everything below is in the `web` group because this file
-// is, and every one of them costs something on a route that only ever answers with an image:
-// StartSession is a read AND a write against the database session table on each of the four faces
-// a landing page asks for, and it plus ValidateCsrfToken attach two `Set-Cookie` headers, which
-// stop any shared cache from honouring the `s-maxage` this route sends. HandleInertiaRequests adds
-// a `Vary: X-Inertia` that splits that cache again. Nothing here reads the session - not even the
-// 404, which is a self-contained blade page.
-// SecurityHeaders and SubstituteBindings stay: `nosniff` matters more here than anywhere.
+// Nothing here reads the session - not even the 404, which is a self-contained blade page.
 Route::get('avatar/{login}', [AvatarController::class, 'show'])
     ->where('login', '[A-Za-z0-9][A-Za-z0-9-]{0,38}')
-    ->withoutMiddleware([
-        EncryptCookies::class,
-        AddQueuedCookiesToResponse::class,
-        StartSession::class,
-        ShareErrorsFromSession::class,
-        ValidateCsrfToken::class,
-        HandleInertiaRequests::class,
-        AddLinkHeadersForPreloadedAssets::class,
-    ])
+    ->withoutMiddleware($stateless)
     ->name('avatar');
 
 Route::get('/', [LandingController::class, 'index'])->name('home');
@@ -141,6 +155,11 @@ if (is_file($dev = __DIR__.'/dev.php')) {
  */
 Route::get('{slug}.{format}', [CardImageController::class, 'show'])
     ->middleware('throttle:6,1')
+    // Same treatment as the avatar route, and for the same reason: this answers with a file, reads
+    // no session, and sends `s-maxage` that a `Set-Cookie` would have made every shared cache
+    // ignore. It is the route where that matters most - these URLs are embedded in READMEs, so a
+    // CDN hit is the difference between serving a cached file and waking Chromium.
+    ->withoutMiddleware($stateless)
     ->where('slug', '[A-Za-z0-9][A-Za-z0-9-]*')
     ->where('format', 'gif|svg|png')
     ->name('public.card.image');

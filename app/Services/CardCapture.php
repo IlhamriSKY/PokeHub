@@ -5,13 +5,14 @@ namespace App\Services;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Storage;
 use RuntimeException;
+use Symfony\Component\Process\ExecutableFinder;
 use Symfony\Component\Process\Process;
 
 /**
  * The card as an embeddable image, screenshotted from the real card page.
  *
- *     ![my card](https://pokehub.dev/torvalds.gif)   animated, foil moving
- *     ![my card](https://pokehub.dev/torvalds.svg)   still
+ *     ![my card](https://pokehub.ilhamriski.com/torvalds.gif)   animated, foil moving
+ *     ![my card](https://pokehub.ilhamriski.com/torvalds.svg)   still
  *
  * Every format comes from one pipeline, so they cannot disagree with each other or with the page.
  * The foil is the reason: holo.css layers blend modes driven by `--pointer-x/y`, which nothing but
@@ -139,11 +140,6 @@ class CardCapture
     }
 
     /**
-     * The Node script picks its format from the output extension.
-     *
-     * @throws RuntimeException when Chromium is missing or the page never renders a card
-     */
-    /**
      * Squeeze the still into a 255-colour PNG, in place.
      *
      * This file is the og:image, and WhatsApp drops any preview image over roughly 300KB - the
@@ -152,16 +148,35 @@ class CardCapture
      * built for: 760x1058 and the alpha survive untouched, the bytes fall to ~236KB, and the
      * measured error is 2% RMSE with no banding on the face.
      *
-     * Best effort. ImageMagick is already a requirement for nothing else here, so a machine
-     * without it keeps the larger file rather than losing the image.
+     * Best effort, and the only thing in the project that wants ImageMagick: a machine without it
+     * keeps the larger file rather than losing the image. DEPLOY.md says so, since the symptom of
+     * a missing binary is not an error anywhere - it is a share preview that quietly stops
+     * appearing on one chat app.
      */
     private function palettise(string $path): void
     {
-        $proc = new Process(['convert', $path, '-colors', '255', '-depth', '8', 'PNG8:'.$path]);
+        /*
+         * ImageMagick 7 renamed `convert` to `magick` and 8 drops the old name, so `magick` is
+         * tried first. It also has to be: on Windows `convert.exe` is a built-in NTFS tool that
+         * sits in the PATH of every machine, so a bare `convert` there is not this program at all.
+         * Nothing is logged when neither is found, because the caller cannot act on it either.
+         */
+        $finder = new ExecutableFinder;
+        $bin = $finder->find('magick') ?? $finder->find('convert');
+        if ($bin === null) {
+            return;
+        }
+
+        $proc = new Process([$bin, $path, '-colors', '255', '-depth', '8', 'PNG8:'.$path]);
         $proc->setTimeout(30);
         $proc->run();
     }
 
+    /**
+     * The Node script picks its format from the output extension.
+     *
+     * @throws RuntimeException when Chromium is missing or the page never renders a card
+     */
     private function capture(string $url, string $outPath): void
     {
         // The animated format is the only one that has to stay small; the stills are downloads.

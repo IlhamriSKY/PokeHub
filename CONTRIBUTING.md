@@ -28,7 +28,8 @@ Then `npm run dev` and `php artisan serve`.
 
 ## Before you open a pull request
 
-Run all four. CI runs the same ones and will fail the pull request otherwise.
+Run all three, plus the card-model check further down. CI runs the same ones and will fail the pull
+request otherwise.
 
 ```bash
 php artisan test            # Pest / PHPUnit
@@ -47,8 +48,10 @@ There is one extra check for the card model, which has no test runner of its own
 
 ```bash
 npx esbuild resources/js/lib/cardModel.check.ts --bundle --platform=node \
-  --alias:@=./resources/js --outfile=/tmp/check.mjs --format=esm && node /tmp/check.mjs
+  --alias:@=./resources/js --outfile=check.mjs --format=esm && node check.mjs
 ```
+
+The same two lines CI runs. `check.mjs` is gitignored, so it can be left where it lands.
 
 ## What makes a change easy to review
 

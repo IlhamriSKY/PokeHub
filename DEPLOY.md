@@ -72,7 +72,16 @@ npm ci                      # NOT --omit=dev: puppeteer/gifenc/pngjs are devDepe
 sudo apt-get install -y \
   libnss3 libatk1.0-0 libatk-bridge2.0-0 libcups2 libdrm2 libxkbcommon0 \
   libxcomposite1 libxdamage1 libxfixes3 libxrandr2 libgbm1 libasound2 libpango-1.0-0
+
+# ImageMagick, for the .png only. Optional, and the one dependency whose absence is silent.
+sudo apt-get install -y imagemagick
 ```
+
+ImageMagick earns its line because of how it fails. `.png` is the `og:image` every card page points
+at, and WhatsApp drops a preview image over roughly 300KB — the raw capture is ~1MB. `CardCapture`
+palettises it down to ~236KB, and without the binary it simply skips that step: no error, no log
+entry, every card still serves, and shared links quietly preview as a bare title on one chat app.
+It looks for `magick` first and falls back to `convert`, so either ImageMagick 6 or 7 works.
 
 Verify before trusting it:
 

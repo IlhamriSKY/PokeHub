@@ -223,7 +223,11 @@ class CardSettingsService
 
         if ($type === 'user' && $id) {
             $row = User::find($id);
-            if (! $row || ! is_array($row->card)) {
+            // The same test find() applies, so the two cannot disagree about what this key names.
+            // Without the profile check a card that is somehow only {"rarity": ...} still saves,
+            // and the text write below hands it a stub profile holding nothing but a name - a
+            // half-shape nothing else in the app knows how to render.
+            if (! $row || ! is_array($row->card) || empty($row->card['profile'])) {
                 return false;
             }
             // Merge, never replace: everything the panel does not own is generated data.

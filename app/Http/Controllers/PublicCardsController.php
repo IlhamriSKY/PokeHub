@@ -104,9 +104,6 @@ class PublicCardsController extends Controller
      * payload is assembled from a cached `profiles` row: no single query returns them and the
      * users together. It is a handful of rows, so filtering them here costs nothing.
      *
-     * Appended to the first page only, since repeating them above every page of a paginated list
-     * would push real results off the screen.
-     *
      * @return array<int, array<string, mixed>>
      */
     private function showcase(string $q, string $rarity, int $page, int $lastPage): array

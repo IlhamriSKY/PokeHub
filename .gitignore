@@ -31,6 +31,8 @@ auth.json
 # Optional local-only developer routes. Stays on the machine that needs it: routes/web.php requires
 # it only when present, so a clone without it behaves exactly like production.
 /routes/dev.php
+# Build output of the card-model self-check, which CONTRIBUTING and CI both drop here.
+/check.mjs
 Homestead.json
 Homestead.yaml
 npm-debug.log
