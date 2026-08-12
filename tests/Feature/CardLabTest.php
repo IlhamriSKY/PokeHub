@@ -5,7 +5,10 @@ namespace Tests\Feature;
 use App\Models\Profile;
 use App\Models\ShowcaseCard;
 use App\Models\User;
+use App\Services\GithubCardService;
+use Database\Seeders\CardAssetSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Http;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
@@ -264,5 +267,58 @@ class CardLabTest extends TestCase
         $this->assertSame('Ash Ketchum', $profile->github_json['name']);
         // Generated fields stay put, same as the user branch.
         $this->assertSame(9000, $profile->github_json['followers']);
+    }
+
+    /**
+     * Refreshing a card must not undo a restyle.
+     *
+     * `?fresh=1` rebuilt card_json from scratch, so it kept the lore and dropped the two fields
+     * that ARE the card: the rarity, leaving every reader to recompute one from the live stats,
+     * and the axes, dropping the frame back to the 1-gen default and the foil back to auto. Eight
+     * rows in the live database had already been stripped that way. A refresh is about the STATS.
+     */
+    public function test_refreshing_a_card_keeps_its_rarity_and_styling()
+    {
+        Profile::create([
+            'login' => 'octocat',
+            'github_json' => ['login' => 'octocat', 'name' => 'The Octocat', 'followers' => 10],
+            'card_json' => ['ai' => null, 'rarity' => 'secret', 'axes' => ['generation' => 'tcg-gen', 'glare' => 'hyper']],
+            'fetched_at' => 0,
+        ]);
+
+        Http::fake([
+            'api.github.com/users/octocat' => Http::response(['login' => 'octocat', 'name' => 'The Octocat', 'followers' => 9000]),
+            'api.github.com/users/octocat/repos*' => Http::response([]),
+        ]);
+
+        $this->actingAs($this->admin())->getJson('/api/github?u=octocat&fresh=1')->assertOk();
+
+        $card = Profile::find('octocat')->card_json;
+        $this->assertSame('secret', $card['rarity'], 'a refresh recomputed the rarity');
+        $this->assertSame('tcg-gen', $card['axes']['generation'], 'a refresh reset the frame');
+        $this->assertSame('hyper', $card['axes']['glare'], 'a refresh reset the foil to auto');
+        // The stats are what a refresh IS for, so those do move.
+        $this->assertSame(9000, Profile::find('octocat')->github_json['followers']);
+    }
+
+    /**
+     * A card born from the public search box states its foil rather than deferring to the rarity.
+     *
+     * 'auto' is not a foil - it means "whatever the preset implies", which is why every generated
+     * card read Auto in the lab. The slug picked here must be the one that renders the same holo
+     * the rarity already would, so making it explicit changes nothing on screen.
+     */
+    public function test_a_generated_card_carries_an_explicit_foil()
+    {
+        $this->seed(CardAssetSeeder::class);
+        $svc = app(GithubCardService::class);
+
+        foreach (['secret' => 'secret', 'pokeball' => 'pokeball', 'common' => 'none'] as $preset => $expected) {
+            $this->assertSame($expected, $svc->glareFor($preset));
+            $this->assertSame($expected, $svc->axesFor('someone', $preset)['glare']);
+        }
+
+        // An unknown preset must degrade to a real slug, never to a broken axis.
+        $this->assertSame('none', $svc->glareFor('no-such-preset'));
     }
 }

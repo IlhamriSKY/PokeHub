@@ -31,6 +31,9 @@ class GithubCardService
     /** Memoised presetsByTier(). Per-instance, so it never outlives the request. */
     private ?array $byTier = null;
 
+    /** Memoised glareFor(): rarity preset slug -> glare slug. Same lifetime, same reason. */
+    private ?array $glareByPreset = null;
+
     public function __construct()
     {
         $this->cfg = config('pokehub');
@@ -131,6 +134,8 @@ class GithubCardService
             unset($profile['readme'], $profile['orgs']); // AI inputs only; keep github_json compact
         }
 
+        $rarity = $this->rarityFor($login, $profile);
+
         return [
             Profile::updateOrCreate(
                 ['login' => $login],
@@ -139,7 +144,7 @@ class GithubCardService
                     // `rarity` and `axes` are stored, not derived on render, so a generated card is
                     // a card like any other: the admin lab can restyle it, and the gallery can
                     // filter on it in SQL instead of computing a tier per row in PHP.
-                    'card_json' => ['ai' => $lore, 'rarity' => $this->rarityFor($login, $profile), 'axes' => $this->axesFor($login)],
+                    'card_json' => ['ai' => $lore, 'rarity' => $rarity, 'axes' => $this->axesFor($login, $rarity)],
                     'fetched_at' => time(),
                 ]
             ),
@@ -508,13 +513,54 @@ class GithubCardService
      * across reloads - but on its own salt, so the generation and the rarity do not move in
      * lockstep and produce only three combinations instead of nine.
      *
+     * The foil is the other half, and it is not a free choice: `glareFor` pins the one the rarity
+     * already implies, so the card states its foil instead of deferring to whatever the preset
+     * happens to mean later.
+     *
      * @return array<string, string>
      */
-    public function axesFor(string $login): array
+    public function axesFor(string $login, string $rarity = ''): array
     {
         $gens = CardAsset::where('category', 'generation')->where('enabled', true)->orderBy('slug')->pluck('slug')->all();
 
-        return $gens ? ['generation' => $gens[crc32('gen:'.strtolower($login)) % count($gens)]] : [];
+        $axes = $gens ? ['generation' => $gens[crc32('gen:'.strtolower($login)) % count($gens)]] : [];
+        if ($rarity !== '') {
+            $axes['glare'] = $this->glareFor($rarity);
+        }
+
+        return $axes;
+    }
+
+    /**
+     * The glare slug that matches a rarity preset.
+     *
+     * `glare: 'auto'` is not a foil. It means "whatever the rarity implies": resolveOverrides drops
+     * the override and the card falls back to the preset's own `dr`. That reads fine until anything
+     * touches the rarity, and it left every generated card reporting Auto in the lab with no way to
+     * see what it would actually print - which is what "the holo is still auto" is about.
+     *
+     * Matched on `dr`, the data-rarity string both sides already store, rather than on a hand-kept
+     * table of pairs that goes stale the moment an admin adds a preset. Thirty of the thirty-one
+     * presets have a glare carrying the same dr. `common` has none, and 'none' is exactly
+     * equivalent there: resolveOverrides turns its empty dr back into 'common'.
+     *
+     * Held for the lifetime of this service, like presetsByTier, since a backfill asks per row.
+     */
+    public function glareFor(string $preset): string
+    {
+        if ($this->glareByPreset === null) {
+            $byDr = [];
+            foreach (CardAsset::where('category', 'glare')->where('enabled', true)->get(['slug', 'meta']) as $g) {
+                $byDr[(string) ($g->meta['dr'] ?? '')] = $g->slug;
+            }
+
+            $this->glareByPreset = [];
+            foreach (CardAsset::where('category', 'rarity_preset')->get(['slug', 'meta']) as $p) {
+                $this->glareByPreset[$p->slug] = $byDr[(string) ($p->meta['dr'] ?? '')] ?? 'none';
+            }
+        }
+
+        return $this->glareByPreset[$preset] ?? 'none';
     }
 
     /**

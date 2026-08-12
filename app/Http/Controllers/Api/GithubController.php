@@ -67,6 +67,18 @@ class GithubController extends Controller
                 if ($repoErr === null || ! $cached) {
                     // Any already-cached lore survives a failed regeneration below.
                     $prevAi = is_array($card) ? ($card['ai'] ?? null) : null;
+                    /*
+                     * ...and so do the two fields that ARE the card rather than its contents.
+                     *
+                     * `$card` is rebuilt from scratch three lines down, which silently threw both
+                     * away: a regenerated card lost its stored rarity, so every reader fell back to
+                     * recomputing one from the live stats, and lost its axes, so the frame dropped
+                     * to the 1-gen default and the foil to `auto`. Eight of the rows in the live
+                     * database had already been stripped this way. A restyle in the lab is
+                     * editorial and a refresh is about the STATS, so a refresh must not undo one.
+                     */
+                    $prevRarity = is_array($card) ? ($card['rarity'] ?? null) : null;
+                    $prevAxes = is_array($card) ? ($card['axes'] ?? null) : null;
                     $github = $svc->buildProfile($user, is_array($repos) ? $repos : []);
                     $card = ['ai' => null];
                     if ($repoErr === null) {
@@ -79,6 +91,10 @@ class GithubController extends Controller
                         // can never make a card worse than it was.
                         $card['ai'] = $svc->aiGenerate($github) ?? $prevAi;
                         unset($github['readme'], $github['orgs']); // AI inputs only; keep github_json compact
+
+                        // Kept if the card already had them, derived if this is its first fetch.
+                        $card['rarity'] = $prevRarity ?? $svc->rarityFor($login, $github);
+                        $card['axes'] = $prevAxes ?? $svc->axesFor($login, $card['rarity']);
 
                         Profile::updateOrCreate(
                             ['login' => $login],
