@@ -1,4 +1,6 @@
+import { cardFocused, ZOOM_SELECTOR } from '@/lib/cardFocus';
 import { deviceTiltPossible, onDeviceTilt, requestDeviceTilt, type Tilt } from '@/lib/deviceTilt';
+import { registerTiltCard, tiltDrives } from '@/lib/tiltBudget';
 import { useEffect, useRef } from 'react';
 
 const round = (v: number, p = 3) => parseFloat(v.toFixed(p));
@@ -46,6 +48,17 @@ export function usePointerTilt<T extends HTMLElement>(idle?: { index: number; co
         if (!card) return;
         const rotator = card.querySelector<HTMLElement>('.card__rotator');
         if (!rotator) return;
+
+        /*
+         * Is this the enlarged copy? Asked of the DOM once, at mount, rather than taken from a
+         * prop: a card rendered inside a zoom overlay IS the enlarged one by construction, so no
+         * page has to remember to say which of its cards that is - and the previous version of
+         * this, which did ask, was wrong on every page at once because nobody ever passed it.
+         */
+        const inZoom = !!card.closest(ZOOM_SELECTOR);
+
+        /** Another card is enlarged over this one, so nothing painted here can be seen. */
+        const eclipsed = () => !inZoom && cardFocused();
 
         let raf: number | null = null;
         let pending: Record<string, number> | null = null;
@@ -136,6 +149,23 @@ export function usePointerTilt<T extends HTMLElement>(idle?: { index: number; co
                 card.style.removeProperty(p);
         };
 
+        /*
+         * A MOUSE leaving the card means the card is nobody's any more, so it goes back to rest.
+         *
+         * A TOUCH pointer "leaving" means nothing of the kind: the browser destroys the pointer
+         * the instant a finger lifts and fires this on every single tap, while the finger is
+         * still right there over the card. onTouchEnd below is what owns a lifted finger, and it
+         * knows to leave the foil alone when the gyro is about to carry on driving - which this
+         * was quietly undoing on the same gesture, since it wipes all ten properties with no
+         * such check. Measured: one tap on an enlarged card dropped the foil to its resting 0.3
+         * for 790ms, the full TOUCH_HOLD_MS lockout, before the gyro was let back in to repaint
+         * it. That is the flicker, and it fires again on every tap.
+         */
+        const onPointerLeave = (e: PointerEvent) => {
+            if (e.pointerType === 'touch') return;
+            onLeave();
+        };
+
         const onTouchEnd = () => {
             touchedAt = Date.now();
             // The one gesture on the card itself, which is where iOS wants the motion prompt to
@@ -148,7 +178,7 @@ export function usePointerTilt<T extends HTMLElement>(idle?: { index: number; co
         };
 
         rotator.addEventListener('pointermove', onMove);
-        rotator.addEventListener('pointerleave', onLeave);
+        rotator.addEventListener('pointerleave', onPointerLeave);
         rotator.addEventListener('touchmove', onMove, { passive: true });
         rotator.addEventListener('touchend', onTouchEnd);
 
@@ -162,22 +192,37 @@ export function usePointerTilt<T extends HTMLElement>(idle?: { index: number; co
         let offTimer: ReturnType<typeof setTimeout> | undefined;
         let observer: IntersectionObserver | undefined;
         let unsubscribe: (() => void) | undefined;
+        let unregister: (() => void) | undefined;
 
         if (deviceTiltPossible()) {
+            /*
+             * A card in a grid is in the running for the tilt; the enlarged copy in a zoom overlay
+             * is not, because it is the only card anyone can see and must never lose its turn to
+             * the grid it is covering. See tiltBudget for what is being rationed and why.
+             */
+            if (!inZoom) unregister = registerTiltCard(card);
+
             const onTilt = ({ x, y }: Tilt) => {
                 tiltedAt = Date.now();
                 if (!onScreen || Date.now() - touchedAt < TOUCH_HOLD_MS) return;
-                // The zoom overlay mounts a SECOND copy of the same card over the grid. Both are
-                // on screen, so both were painting a full holo stack every reading - twice the
-                // work, on the device least able to afford it. The enlarged one is the only one
-                // anyone can see.
-                if (!card.classList.contains('active') && document.querySelector('.card.active')) return;
+                // The zoom overlay mounts a SECOND copy of the card over a grid that is still
+                // on screen behind it, and the gyro drives every card at once - it needs no
+                // pointer over any of them. Measured on /cards before this: seven full holo
+                // stacks painted per reading, six of them underneath the sheet.
+                if (eclipsed()) return;
+                // Not one of the cards nearest the middle of the screen, so it holds its last
+                // pose rather than painting. Six cards in view was ~42fps; four is a locked 60.
+                if (!inZoom && !tiltDrives(card)) return;
                 queue(clamp(round(50 + x * 50)), clamp(round(50 + y * 50)));
             };
 
             observer = new IntersectionObserver(
-                ([entry]) => {
-                    onScreen = entry.isIntersecting;
+                (entries) => {
+                    // The LAST record, not the first. One callback can carry several coalesced
+                    // records for the same element, and entries[0] is the OLDEST of them - which
+                    // is exactly backwards during the in-and-out flip a reflow under a live
+                    // sensor produces, and would leave a visible card believing it was gone.
+                    onScreen = entries[entries.length - 1].isIntersecting;
                     if (offTimer) {
                         clearTimeout(offTimer);
                         offTimer = undefined;
@@ -230,6 +275,21 @@ export function usePointerTilt<T extends HTMLElement>(idle?: { index: number; co
 
             const tick = () => {
                 idleRaf = requestAnimationFrame(tick);
+
+                // Under a zoom overlay: hand the card back to rest once, then stop. Without this
+                // the four showcase cards go on sweeping behind the sheet, and because they are
+                // the overlay's backdrop that also forces its blur to re-rasterise every frame.
+                // Treated as "not my turn" rather than as an interruption, so the reset that a
+                // hidden card can afford still happens.
+                if (eclipsed()) {
+                    if (animating) {
+                        animating = false;
+                        onLeave();
+                    }
+
+                    return;
+                }
+
                 // A real pointer always wins, and so does the handset's own tilt: both are someone
                 // actually moving the card, and their handlers own it while they are there. No
                 // onLeave here - whoever is driving has already written this frame.
@@ -285,13 +345,14 @@ export function usePointerTilt<T extends HTMLElement>(idle?: { index: number; co
         // teardown, which is how a listener gets left behind the next time one of them grows one.
         return () => {
             rotator.removeEventListener('pointermove', onMove);
-            rotator.removeEventListener('pointerleave', onLeave);
+            rotator.removeEventListener('pointerleave', onPointerLeave);
             rotator.removeEventListener('touchmove', onMove);
             rotator.removeEventListener('touchend', onTouchEnd);
             if (onEnter) rotator.removeEventListener('pointerenter', onEnter);
             if (onExit) rotator.removeEventListener('pointerleave', onExit);
             observer?.disconnect();
             if (offTimer) clearTimeout(offTimer);
+            unregister?.();
             unsubscribe?.();
             if (raf !== null) cancelAnimationFrame(raf);
             if (idleRaf !== null) cancelAnimationFrame(idleRaf);

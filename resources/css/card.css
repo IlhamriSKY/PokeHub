@@ -273,6 +273,103 @@
     opacity: calc(var(--card-opacity) * 0.5) !important;
 }
 
+/* While a card is enlarged, the cards it covers stop painting.
+   `.card-zoomed` is set on <html> by CardZoom (see lib/cardFocus.ts, which explains why this
+   is worth doing and what it costs to look at - measured: nothing).
+
+   `visibility`, deliberately, and not `display: none` or `content-visibility: hidden`: those
+   two take the grid's boxes away, which would collapse the page under the overlay and jump the
+   scroll position on close - and would also tell every card's IntersectionObserver it had left
+   the screen, so each would hand itself back to its resting CSS and repaint on the way out.
+   Hidden visibility keeps the layout and the observers exactly as they were. */
+.card-zoomed .card {
+    visibility: hidden;
+}
+.card-zoomed [data-card-zoom] .card {
+    visibility: visible;
+}
+
+/* On a handset the zoom sheet goes SOLID: nothing of the page shows through it, and the enlarged
+   card is the only thing on the screen.
+
+   The frosted `bg-black/80 backdrop-blur-sm` it replaces is a desktop luxury that a phone pays
+   twice for. A backdrop-filter has to read the viewport back and re-filter it on every frame the
+   thing in front of it moves - and the thing in front of it is the one card still running the
+   foil, so the readback happens at gyro rate. It is not the blur RADIUS that costs: measured on a
+   simulated handset, halving it to 2px changed nothing, and only removing the filter outright
+   moved the page from 30fps to 60. Being fully opaque rather than 80% earns the rest, by letting
+   the compositor skip everything behind the sheet instead of blending it.
+
+   `pointer: coarse` is the same gate the gyro itself uses (lib/deviceTilt.ts), so the treatment
+   lands on exactly the devices that have the problem.
+
+   The colour is this project's own lightbox dark (.zoom-overlay below), not a new one. */
+@media (pointer: coarse) {
+    .card-zoom {
+        background-color: #06080c;
+        -webkit-backdrop-filter: none;
+        backdrop-filter: none;
+    }
+}
+
+/* Poke Ball / Master Ball, on a handset: put a FLOOR under the two layers whose brightness and
+   colour are computed from how far the tilt is from centre.
+
+   Upstream drives both from --pointer-from-center with nothing under them:
+       opacity: calc( var(--card-opacity) + var(--pointer-from-center) - 0.75 )   ->  0.25 + pfc
+       filter:  ... saturate( calc( var(--pointer-from-center) ) )                ->  0 at centre
+   Under a MOUSE that is the effect working as intended: you sweep the pointer deliberately, out
+   to the edges, and the ball foil lights up as it catches you. A hand-held phone does the
+   opposite - it sits NEAR centre and trembles there, which is the one part of the curve where
+   these bottom out. Measured across a gentle 4deg tilt, this layer swung 0.25 -> 0.61 and back,
+   a 2.4x brightness pulse, while every other recipe held a flat 1.00. That pulse is the flicker
+   people see on the ball cards and on nothing else.
+
+   Remapping pfc into the top of its range keeps the direction of the effect - it still brightens
+   and colours up as the card is tilted away from you - at the same average brightness, with the
+   swing cut to about 1.3x. Deliberately NOT `!important`: the .is-full rule above already pins
+   these to a steady value for full-art ball cards, for its own reason, and it should keep
+   winning where it applies.
+
+   `pointer: coarse` is the gyro's own gate (lib/deviceTilt.ts), so a mouse still gets the
+   original curve untouched. */
+@media (pointer: coarse) {
+    .card[data-rarity$='pokeball holo'] .card__shine:before,
+    .card[data-rarity$='masterball holo'] .card__shine:before {
+        opacity: calc(var(--card-opacity) * (0.4 + var(--pointer-from-center) * 0.35));
+        filter: brightness(0.75) contrast(2) saturate(calc(0.45 + var(--pointer-from-center) * 0.55));
+    }
+    .card[data-rarity$='pokeball holo'] .card__shine:after,
+    .card[data-rarity$='masterball holo'] .card__shine:after {
+        filter: brightness(var(--outer-brightness)) contrast(1.8) saturate(calc(0.45 + var(--pointer-from-center) * 0.65));
+    }
+
+    /* ...and hold that layer's MASK still.
+
+       Upstream masks it with two layers subtracted from each other - the ball image, minus a
+       radial spotlight centred on the pointer - so the mask itself is rebuilt and recomposited on
+       every reading:
+           mask-image: var(--mask), radial-gradient(farthest-corner at var(--pointer-x) …);
+           mask-composite: subtract;
+       On top of a mix-blend-mode and a filter, on the same element. In the whole of holo.css only
+       this recipe composites masks at all - `mask-composite` appears in exactly two rules, and
+       this is the only one whose mask moves - which is why the ball cards are the only ones that
+       misbehave while every other rarity is steady. A per-frame masked-and-blended repaint is
+       what Android's GPU drivers drop tiles on, and it is invisible to a software rasterizer,
+       which is why it measures perfectly clean here and still flickers in the hand.
+
+       Dropping the spotlight layer leaves the ball motifs exactly as they are, and leaves the
+       mask static: one image, positioned from the per-card seed, which never changes. With a
+       single layer `subtract` no longer means anything, so it is stated plainly as `add`. */
+    .card[data-rarity$='pokeball holo'] .card__shine:after,
+    .card[data-rarity$='masterball holo'] .card__shine:after {
+        -webkit-mask-image: var(--mask);
+        mask-image: var(--mask);
+        -webkit-mask-composite: source-over;
+        mask-composite: add;
+    }
+}
+
 /* =========================================================
    Click-to-enlarge overlay (lightbox)
    ========================================================= */
