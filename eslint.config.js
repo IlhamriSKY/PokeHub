@@ -39,8 +39,9 @@ export default [
     },
     {
         // scripts/ runs under Node, not in a browser: without this `process` and `Buffer` are
-        // flagged as undefined by the browser-globals block above.
-        files: ['scripts/**/*.{js,mjs}'],
+        // flagged as undefined by the browser-globals block above. promo/scripts/ is the same
+        // kind of thing for the promo video (see promo/README.md).
+        files: ['scripts/**/*.{js,mjs}', 'promo/scripts/**/*.{js,mjs}'],
         languageOptions: {
             globals: {
                 ...globals.node,

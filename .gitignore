@@ -19,6 +19,7 @@
 /storage/*.key
 /storage/pail
 /vendor
+/promo
 auth.json
 # Card artwork: frames, foils, holo textures. Not distributed with this repository at all. Most of
 # it derives from Pokemon Trading Card Game designs and is not this project's to license under the
