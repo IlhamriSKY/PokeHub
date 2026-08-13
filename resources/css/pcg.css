@@ -1163,19 +1163,30 @@
     width: auto;
     object-fit: contain;
 }
-/* 5.2cqw is about the height the six badge-shaped tags render at anyway (they range
-   4.90-5.83cqw), so sizing on height leaves them unchanged to the eye while lifting mega,
-   which is much wider than it is tall, to match. */
+/* One shared HEIGHT does not give one shared size, and measuring the assets says why. Their
+   aspects are not a spread but two outliers around a cluster: ultra-beast is 300x100 (3.00),
+   mega is 300x44 (6.82), and the other five sit between 3.29 and 3.57. Height-driven sizing
+   makes the WIDTH follow that number, so at a single height mega rendered 68.9% of the card
+   wide against 33-36% for the cluster - twice the stamp, on the same card.
+
+   So the height is set per SHAPE: the cluster shares one, and the two outliers get their own,
+   each solved from `height = target width / aspect` for a target of 38% of the card. That lands
+   all seven within 35.7-38.8%, which is as close as five different aspects can be brought
+   without cropping any of them.
+
+   Right edge: the frame's photo window ends at 87.80%, so right:12.5% puts the stamp's edge at
+   87.5% - a quarter-percent inside the window rather than the 1.3% short it used to sit. */
 .gen-1-gen .pcg-tag {
     top: 13.6%;
-    right: 13.5%;
-    height: 10.1cqw; /* 5.2 +15%, then +30% twice */
+    right: 12.5%;
+    height: 10.86cqw; /* 38% / 3.5, the cluster's aspect */
     z-index: 3;
 }
-/* Ultra Beast is the squarest tag (aspect 3.0), so at the shared height it reads
-   smaller than the banner-shaped tags -- bump it on its own via the data-tag hook. */
 .gen-1-gen .pcg-tag[data-tag='ultra-beast'] {
-    height: 12.68cqw; /* 7.5 +30% twice, in step with the shared height above */
+    height: 12.67cqw; /* 38% / 3.00 */
+}
+.gen-1-gen .pcg-tag[data-tag='mega'] {
+    height: 5.57cqw; /* 38% / 6.82 - the long thin banner, which needs the least height */
 }
 /* Rarity pips sit bottom-RIGHT on 1st gen, not bottom-left: Base Set puts the rarity symbol
    after the collection number, and pokecardgenerator does the same (its star measures
@@ -1347,6 +1358,13 @@
     width: 51.84cqw; /* 30.68 +30% twice */
     height: 10.88%; /* 6.44 +30% twice */
     z-index: 3;
+}
+/* The box normalises the other six, because its own aspect (3.42) sits inside their range - but
+   ultra-beast is squarer than the box at 3.00, so `contain` fits it by HEIGHT and it stopped
+   45.5% of the card wide against their ~51%. Deepening the box to that aspect lets it fill the
+   width like the rest. 51.84cqw / 3.00 = 17.28cqw, which is 12.4% of the card's height. */
+.gen-tcg-gen .pcg-tag[data-tag='ultra-beast'] {
+    height: 12.4%;
 }
 
 /* ===================================================================
@@ -1633,11 +1651,23 @@
 .gen-tcg-gen .pcg-name-emblem {
     width: 9.4cqw;
 }
+/* Same per-shape sizing as 1st gen, solved for a 30% target, and for the same reason: at one
+   shared height ultra-beast came out 21.3% of the card wide and mega 48.4%, so the squarest
+   stamp read smallest and the banner read like a title bar.
+
+   Right edge: SV's photo window ends at 92.35% and right:10% put the stamp at 90%, leaving it
+   visibly short of the corner it belongs in. right:8% lands it on 92%. */
 .gen-scarlet-violet .pcg-tag {
     top: 10.5%;
-    right: 10%;
-    height: 7.1cqw; /* 4.2 +30% twice */
+    right: 8%;
+    height: 8.57cqw; /* 30% / 3.5, the cluster's aspect */
     z-index: 3;
+}
+.gen-scarlet-violet .pcg-tag[data-tag='ultra-beast'] {
+    height: 10cqw; /* 30% / 3.00 */
+}
+.gen-scarlet-violet .pcg-tag[data-tag='mega'] {
+    height: 4.4cqw; /* 30% / 6.82 */
 }
 /* SV shows ONE small rarity mark, not a pip row. Measured by swapping between rare /
    illustration-rare / ace-spec and diffing: three pairs all land on L5.15-R7.72%, T94.75-B96.59%
