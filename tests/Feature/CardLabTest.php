@@ -396,14 +396,33 @@ class CardLabTest extends TestCase
         }
         $this->assertGreaterThan(1, count($drawn), 'every card of one rarity drew the same foil');
 
-        // Hand-styled: untouched, foil included.
-        $this->assertSame('none', Profile::find('styled')->card_json['axes']['glare']);
+        // The hand-styled one was matte, and a matte card is always eligible: `none` is the absence
+        // of a foil, so there is no choice there to protect. Its styling still survives.
+        $styled = Profile::find('styled')->card_json;
+        $this->assertNotSame('none', $styled['axes']['glare'], 'a matte card was left matte');
+        $this->assertSame('mega', $styled['axes']['tag'], 'the refoil overwrote styling it should not touch');
+    }
 
-        // --force is how a matte hand-styled card is brought in, and it touches the foil ONLY.
+    /** A foil somebody chose survives a refoil; only --force overrides that. */
+    public function test_refoiling_keeps_a_foil_that_was_chosen()
+    {
+        $this->seed(CardAssetSeeder::class);
+
+        Profile::create([
+            'login' => 'picky',
+            'github_json' => ['login' => 'picky', 'name' => 'Picky', 'followers' => 5],
+            // Styled by hand, and wearing a real foil rather than none.
+            'card_json' => ['ai' => null, 'rarity' => 'common', 'axes' => ['generation' => '1-gen', 'glare' => 'cosmos', 'tag' => 'mega']],
+            'fetched_at' => 0,
+        ]);
+
+        $this->artisan('pokehub:card-axes --refoil')->assertSuccessful();
+        $this->assertSame('cosmos', Profile::find('picky')->card_json['axes']['glare']);
+
         $this->artisan('pokehub:card-axes --refoil --force')->assertSuccessful();
-        $forced = Profile::find('styled')->card_json;
-        $this->assertNotSame('none', $forced['axes']['glare'], '--force left the card matte');
-        $this->assertSame('mega', $forced['axes']['tag'], '--force overwrote styling it had no business touching');
+        $forced = Profile::find('picky')->card_json;
+        $this->assertNotSame('cosmos', $forced['axes']['glare'], '--force did not override the choice');
+        $this->assertSame('mega', $forced['axes']['tag'], '--force reached past the foil');
     }
 
     /** A claimed card is the one its owner looks at, so the ladder has to reach it too. */

@@ -72,7 +72,7 @@ class FillCardAxes extends Command
              * written keep the one-foil-per-rarity assignment they were given - which is the very
              * uniformity the ladder exists to break.
              */
-            if ($refoil && ($force || $this->untouched($card)) && ! empty($card['rarity'])) {
+            if ($refoil && $this->mayRedraw($card, $force) && ! empty($card['rarity'])) {
                 $drawn = $svc->foilFor($github['login'], (string) $card['rarity']);
                 if ($drawn !== ($card['axes']['glare'] ?? null)) {
                     $filled[] = 'glare '.($card['axes']['glare'] ?? '-')." -> {$drawn}";
@@ -103,7 +103,7 @@ class FillCardAxes extends Command
 
             // A claimed card is the one its owner actually looks at, so it wants a foil off the
             // ladder every bit as much as an unclaimed one - and it was the half this reached last.
-            if ($refoil && ($force || $this->untouched($card)) && ! empty($card['rarity'])) {
+            if ($refoil && $this->mayRedraw($card, $force) && ! empty($card['rarity'])) {
                 $drawn = $svc->foilFor((string) $login, (string) $card['rarity']);
                 if ($drawn !== ($card['axes']['glare'] ?? null)) {
                     $filled[] = 'glare '.($card['axes']['glare'] ?? '-')." -> {$drawn}";
@@ -143,6 +143,27 @@ class FillCardAxes extends Command
             : "{$touched} cards filled in.");
 
         return self::SUCCESS;
+    }
+
+    /**
+     * May this card's foil be re-drawn?
+     *
+     * Normally only when nobody has styled it. Two exceptions:
+     *
+     *   --force says so outright, and
+     *   the card has no foil at all.
+     *
+     * The second is not a loophole. `none` is the ABSENCE of a foil, so there is no choice there to
+     * protect - and on a site whose whole promise is a holographic card, a matte one is the defect
+     * this command exists to clear rather than a preference someone expressed.
+     *
+     * @param  array<string, mixed>  $card
+     */
+    private function mayRedraw(array $card, bool $force): bool
+    {
+        return $force
+            || $this->untouched($card)
+            || (($card['axes']['glare'] ?? '') === 'none');
     }
 
     /**
