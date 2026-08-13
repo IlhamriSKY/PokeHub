@@ -359,4 +359,44 @@ class CardLabTest extends TestCase
         // Nothing draws the absence of a foil, which is the point of the ladder excluding it.
         $this->assertNotContains('none', $common);
     }
+
+    /**
+     * `--refoil` reaches the cards already written.
+     *
+     * The ladder only decides what a NEW card wears, so without this the rows already stored keep
+     * the one-foil-per-rarity assignment that made every card of a tier identical. Same guard as
+     * `--retier`: a card someone styled by hand keeps the foil they chose.
+     */
+    public function test_refoiling_redraws_untouched_cards_and_leaves_styled_ones_alone()
+    {
+        $this->seed(CardAssetSeeder::class);
+
+        foreach (['a', 'b', 'c', 'd', 'e', 'f'] as $login) {
+            Profile::create([
+                'login' => $login,
+                'github_json' => ['login' => $login, 'name' => $login, 'followers' => 5],
+                'card_json' => ['ai' => null, 'rarity' => 'common', 'axes' => ['generation' => '1-gen', 'glare' => 'none']],
+                'fetched_at' => 0,
+            ]);
+        }
+        Profile::create([
+            'login' => 'styled',
+            'github_json' => ['login' => 'styled', 'name' => 'Styled', 'followers' => 5],
+            'card_json' => ['ai' => null, 'rarity' => 'common', 'axes' => ['generation' => '1-gen', 'glare' => 'none', 'tag' => 'mega']],
+            'fetched_at' => 0,
+        ]);
+
+        $this->artisan('pokehub:card-axes --refoil')->assertSuccessful();
+
+        $drawn = [];
+        foreach (['a', 'b', 'c', 'd', 'e', 'f'] as $login) {
+            $glare = Profile::find($login)->card_json['axes']['glare'];
+            $this->assertNotSame('none', $glare, "{$login} was left without a foil");
+            $drawn[$glare] = true;
+        }
+        $this->assertGreaterThan(1, count($drawn), 'every card of one rarity drew the same foil');
+
+        // Hand-styled: untouched, foil included.
+        $this->assertSame('none', Profile::find('styled')->card_json['axes']['glare']);
+    }
 }

@@ -28,7 +28,8 @@ class FillCardAxes extends Command
 {
     protected $signature = 'pokehub:card-axes
                             {--dry-run : Report what would change and write nothing}
-                            {--retier : Also recompute the rarity of untouched generated cards}';
+                            {--retier : Also recompute the rarity of untouched generated cards}
+                            {--refoil : Also re-draw the foil of untouched generated cards from the ladder}';
 
     protected $description = 'Give every stored card an explicit rarity, generation and foil';
 
@@ -36,6 +37,7 @@ class FillCardAxes extends Command
     {
         $dry = (bool) $this->option('dry-run');
         $retier = (bool) $this->option('retier');
+        $refoil = (bool) $this->option('refoil');
         $touched = 0;
 
         // Generated cards. The rarity has to be derived from the profile itself when absent, which
@@ -60,6 +62,19 @@ class FillCardAxes extends Command
                     // wearing the old tier's holo - which is the very thing being repaired.
                     $card['axes']['glare'] = $svc->foilFor($github['login'], $now);
                     $filled[] = "rarity {$was} -> {$now}, glare={$card['axes']['glare']}";
+                }
+            }
+
+            /*
+             * The ladder only decides what a NEW card wears, so without this the cards already
+             * written keep the one-foil-per-rarity assignment they were given - which is the very
+             * uniformity the ladder exists to break.
+             */
+            if ($refoil && $this->untouched($card) && ! empty($card['rarity'])) {
+                $drawn = $svc->foilFor($github['login'], (string) $card['rarity']);
+                if ($drawn !== ($card['axes']['glare'] ?? null)) {
+                    $filled[] = 'glare '.($card['axes']['glare'] ?? '-')." -> {$drawn}";
+                    $card['axes']['glare'] = $drawn;
                 }
             }
 
