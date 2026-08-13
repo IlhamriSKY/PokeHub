@@ -12,7 +12,7 @@ import { useCardOptions } from '@/lib/options';
 import { raritiesFromOptions, rarityOf, type Profile } from '@/lib/rarities';
 import { type BreadcrumbItem, type SharedData } from '@/types';
 import { Head, Link, router, usePage } from '@inertiajs/react';
-import { EyeOff, ImageOff, Search, Wand2 } from 'lucide-react';
+import { EyeOff, ImageOff, Search, Trash2, Wand2 } from 'lucide-react';
 import { useCallback, useState } from 'react';
 
 const breadcrumbs: BreadcrumbItem[] = [
@@ -93,6 +93,24 @@ export default function AdminCards({
                   ? `Take ${u.name}'s card down from /${u.slug}?`
                   : `Publish ${u.name}'s card again?`;
         if (confirm(msg)) router.put(`/admin/cards/${u.id}`, { action }, { preserveScroll: true });
+    };
+
+    /*
+     * Delete, for either kind of row. The wording has to differ, because the two are not the same
+     * act: a generated card is a cached lookup and can be made again by searching that handle,
+     * while a user row is somebody's account and their styling goes with it.
+     *
+     * `confirm` rather than a dialog component, matching the users page - this is the same
+     * irreversible action in the same admin panel, and one of them growing its own modal would
+     * just make the pair read as two different kinds of dangerous.
+     */
+    const remove = (u: CardRow) => {
+        const msg =
+            u.id === null
+                ? `Delete the generated card for @${u.github}? Its rendered images and cached avatar go too. Searching that handle again would build a new one.`
+                : `Delete ${u.name}'s account? Their card and everything they styled goes with it. This cannot be undone.`;
+
+        if (confirm(msg)) router.delete(`/admin/cards/key/${encodeURIComponent(u.key)}`, { preserveScroll: true });
     };
 
     return (
@@ -280,6 +298,10 @@ export default function AdminCards({
                                             Release slug
                                         </Button>
                                     )}
+                                    <Button size="sm" variant="ghost" className="text-destructive" onClick={() => remove(c)}>
+                                        <Trash2 className="mr-1 h-3.5 w-3.5" />
+                                        Delete
+                                    </Button>
                                 </div>
                             </td>
                         </Row>

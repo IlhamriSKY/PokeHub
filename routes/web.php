@@ -117,6 +117,9 @@ Route::middleware(['auth', 'role:admin'])->prefix('admin')->name('admin.')->grou
     Route::delete('users/{user}', [AdminController::class, 'deleteUser'])->name('users.delete');
     Route::get('cards', [AdminController::class, 'cards'])->name('cards');
     Route::put('cards/{user}', [AdminController::class, 'moderateCard'])->name('cards.moderate');
+    // Keyed like the card lab - `user:<id>` or `profile:<login>` - because this page lists both
+    // kinds in one table and they already carry that key for the lab link.
+    Route::delete('cards/key/{key}', [AdminController::class, 'deleteCard'])->name('cards.delete');
     Route::get('assets', [AdminController::class, 'assets'])->name('assets');
     Route::post('assets', [AdminController::class, 'saveAsset'])->name('assets.save');
     Route::post('assets/{asset}/toggle', [AdminController::class, 'toggleAsset'])->name('assets.toggle');

@@ -130,6 +130,84 @@ class CardAccessTest extends TestCase
         });
     }
 
+    /** A generated card is a cached lookup, and deleting it must take its leftovers with it. */
+    public function test_an_admin_can_delete_a_generated_card()
+    {
+        Profile::create([
+            'login' => 'octocat',
+            'github_json' => ['login' => 'octocat', 'name' => 'The Octocat'],
+            'card_json' => ['ai' => null, 'rarity' => 'common'],
+            'fetched_at' => 0,
+        ]);
+
+        $this->actingAs($this->admin())
+            ->delete('/admin/cards/key/'.urlencode('profile:octocat'))
+            ->assertSessionHasNoErrors();
+
+        $this->assertNull(Profile::find('octocat'));
+        // The home page's trainer pool is cached for an hour, so a deleted face would otherwise
+        // stay on it. Forgetting the key is what stops that.
+        $this->assertFalse(Cache::has(LandingController::TRAINERS_KEY));
+    }
+
+    /**
+     * A showcase card renders FROM the profile row, so deleting it would empty a slot on the home
+     * page with no sign of why - cardPayload() returns null and the card is silently dropped.
+     * Taking a card off the landing page is editorial and already has its own switch.
+     */
+    public function test_deleting_a_card_the_home_page_uses_is_refused()
+    {
+        Profile::create([
+            'login' => 'torvalds',
+            'github_json' => ['login' => 'torvalds', 'name' => 'Linus Torvalds'],
+            'card_json' => ['ai' => null],
+            'fetched_at' => 0,
+        ]);
+        ShowcaseCard::create(['login' => 'torvalds', 'name' => 'Linus', 'rarity' => 'secret', 'axes' => [], 'is_active' => true]);
+
+        $this->actingAs($this->admin())
+            ->delete('/admin/cards/key/'.urlencode('profile:torvalds'))
+            ->assertSessionHas('error');
+
+        $this->assertNotNull(Profile::find('torvalds'));
+    }
+
+    /** Deleting through the card table is still deleting an account, so it keeps deleteUser's guards. */
+    public function test_deleting_a_user_from_the_card_table_keeps_the_account_guards()
+    {
+        $admin = $this->admin();
+
+        // Yourself: refused, or an admin can lock themselves out with one click.
+        $this->actingAs($admin)
+            ->delete('/admin/cards/key/'.urlencode("user:{$admin->id}"))
+            ->assertSessionHas('error');
+        $this->assertNotNull(User::find($admin->id));
+
+        // Somebody else: gone, card and all.
+        $victim = User::factory()->create(['card' => ['profile' => ['login' => 'ash'], 'rarity' => 'common']]);
+        $this->actingAs($admin)
+            ->delete('/admin/cards/key/'.urlencode("user:{$victim->id}"))
+            ->assertSessionHasNoErrors();
+        $this->assertNull(User::find($victim->id));
+    }
+
+    public function test_deleting_a_card_is_admin_only()
+    {
+        Profile::create([
+            'login' => 'octocat',
+            'github_json' => ['login' => 'octocat', 'name' => 'The Octocat'],
+            'card_json' => ['ai' => null],
+            'fetched_at' => 0,
+        ]);
+
+        $this->delete('/admin/cards/key/'.urlencode('profile:octocat'))->assertRedirect('/login');
+        $this->actingAs(User::factory()->create())
+            ->delete('/admin/cards/key/'.urlencode('profile:octocat'))
+            ->assertForbidden();
+
+        $this->assertNotNull(Profile::find('octocat'));
+    }
+
     public function test_only_admins_can_restyle_a_card()
     {
         $victim = User::factory()->create(['card' => ['profile' => ['login' => 'x'], 'rarity' => 'common']]);
