@@ -1170,23 +1170,27 @@
    wide against 33-36% for the cluster - twice the stamp, on the same card.
 
    So the height is set per SHAPE: the cluster shares one, and the two outliers get their own,
-   each solved from `height = target width / aspect` for a target of 38% of the card. That lands
-   all seven within 35.7-38.8%, which is as close as five different aspects can be brought
-   without cropping any of them.
+   each solved from `height = target width / aspect`.
 
-   Right edge: the frame's photo window ends at 87.80%, so right:12.5% puts the stamp's edge at
-   87.5% - a quarter-percent inside the window rather than the 1.3% short it used to sit. */
+   The target is 36% of THIS FRAME'S PHOTO WINDOW, not of the card. That distinction is the
+   whole of it: the three frames open windows of 76.00%, 83.64% and 83.89%, so one shared
+   card-relative number put the same stamp at 51% of the window here and 62% on TCG Pocket -
+   the same card wearing a visibly different badge depending on which set it was printed in.
+   Against the window: 0.36 x 76.00 = 27.36% of the card.
+
+   Right edge: the window ends at 87.80%, so right:12.5% puts the stamp's edge at 87.5%, a
+   quarter-percent inside it. Every generation is anchored to that same quarter-percent. */
 .gen-1-gen .pcg-tag {
     top: 13.6%;
     right: 12.5%;
-    height: 10.86cqw; /* 38% / 3.5, the cluster's aspect */
+    height: 7.82cqw; /* 27.36% / 3.5, the cluster's aspect */
     z-index: 3;
 }
 .gen-1-gen .pcg-tag[data-tag='ultra-beast'] {
-    height: 12.67cqw; /* 38% / 3.00 */
+    height: 9.12cqw; /* 27.36% / 3.00 */
 }
 .gen-1-gen .pcg-tag[data-tag='mega'] {
-    height: 5.57cqw; /* 38% / 6.82 - the long thin banner, which needs the least height */
+    height: 4.01cqw; /* 27.36% / 6.82 - the long thin banner, which needs the least height */
 }
 /* Rarity pips sit bottom-RIGHT on 1st gen, not bottom-left: Base Set puts the rarity symbol
    after the collection number, and pokecardgenerator does the same (its star measures
@@ -1349,22 +1353,30 @@
    object-fit:contain caps them all at the measured extent whatever their aspect, and
    object-position pins them to the box's RIGHT edge so a squarer stamp does not float inward
    off the corner it belongs in. */
-/* Both sides of the box scale together, or `contain` would letterbox inside it and the stamp
-   would grow by less than the number says. 30.68 x 6.44 -> 39.88 x 8.37 keeps the aspect, so
-   the artwork inside really does come out 30% larger. */
+/* Both sides of the box scale together, or `contain` letterboxes inside it and the stamp comes
+   out smaller than the number says.
+
+   The box is 36% of this frame's photo window, the same share the other two generations carry:
+   0.36 x 83.64 = 30.11% of the card. It used to be 51.8%, which is 62% of the window against
+   51% on Base Set and 36% on Scarlet & Violet - the same stamp reading as a different badge
+   depending on which set the card was printed in, and the one every "too big" report pointed at.
+
+   Right edge: the window ends at 91.82%, so right:8.5% lands the stamp at 91.5%, the same
+   quarter-percent inside it that the other two use. At right:2.87% it overhung the artwork by
+   5.3% and sat on the frame border instead of in the corner of the picture. */
 .gen-tcg-gen .pcg-tag {
     top: 10.07%;
-    right: 2.87%;
-    width: 51.84cqw; /* 30.68 +30% twice */
-    height: 10.88%; /* 6.44 +30% twice */
+    right: 8.5%;
+    width: 30.11cqw; /* 36% of the 83.64% window */
+    height: 6.32%; /* holds the box's 3.42 aspect */
     z-index: 3;
 }
 /* The box normalises the other six, because its own aspect (3.42) sits inside their range - but
-   ultra-beast is squarer than the box at 3.00, so `contain` fits it by HEIGHT and it stopped
-   45.5% of the card wide against their ~51%. Deepening the box to that aspect lets it fill the
-   width like the rest. 51.84cqw / 3.00 = 17.28cqw, which is 12.4% of the card's height. */
+   ultra-beast is squarer than the box at 3.00, so `contain` fits it by HEIGHT and it stops short
+   of the width. Deepening the box to that aspect lets it fill: 30.11cqw / 3.00 = 10.04cqw, which
+   is 7.2% of the card's height. */
 .gen-tcg-gen .pcg-tag[data-tag='ultra-beast'] {
-    height: 12.4%;
+    height: 7.2%;
 }
 
 /* ===================================================================
