@@ -66,19 +66,37 @@ class PublicCardsSearchTest extends TestCase
         $me = User::factory()->create();
 
         foreach (PublicCardsController::PER_PAGE_OPTIONS as $size) {
+            // The 60 above. The signed-in user is not one of them - it has no card, so the
+            // gallery never lists it. A page cannot hold more than exists, so 100 and 'all' both
+            // come back as the whole list rather than as their own number.
+            $total = 60;
+            $expected = $size === PublicCardsController::PER_PAGE_ALL ? $total : min($size, $total);
+
             $this->actingAs($me)
                 ->get('/cards?per='.$size)
                 ->assertOk()
-                ->assertInertia(fn ($page) => $page->where('per', $size)->count('cards.data', $size));
+                ->assertInertia(fn ($page) => $page->where('per', (string) $size)->count('cards.data', $expected));
         }
+
+        // Only "all" collapses the list to a single page; the fixed sizes still paginate.
+        $this->actingAs($me)
+            ->get('/cards?per=all')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page->where('cards.last_page', 1));
 
         // Off the list, negative, and not a number at all: each falls back to the default.
         foreach (['37', '-5', 'lots'] as $bogus) {
             $this->actingAs($me)
                 ->get('/cards?per='.$bogus)
                 ->assertOk()
-                ->assertInertia(fn ($page) => $page->where('per', 20)->count('cards.data', 20));
+                ->assertInertia(fn ($page) => $page->where('per', '20')->count('cards.data', 20));
         }
+
+        // A stale ?page= must not survive "show all" and page past the end of a one-page list.
+        $this->actingAs($me)
+            ->get('/cards?per=all&page=3')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page->where('cards.current_page', 1)->count('cards.data', 60));
     }
 
     public function test_private_cards_are_never_listed()
