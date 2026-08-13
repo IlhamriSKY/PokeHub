@@ -34,6 +34,26 @@ class GithubCardService
     /** Memoised glareFor(): rarity preset slug -> glare slug. Same lifetime, same reason. */
     private ?array $glareByPreset = null;
 
+    /** Memoised foilLadder() and tierOfPreset(). Same per-instance lifetime, same reason. */
+    private ?array $ladder = null;
+
+    private ?array $tierByPreset = null;
+
+    /**
+     * The four tiers low to high. Ranks the foil ladder and places each tier's window on it;
+     * `rarityTier` names the same four.
+     */
+    private const TIER_RANK = ['common' => 0, 'uncommon' => 1, 'rare' => 2, 'ultra' => 3];
+
+    /**
+     * How much of the foil ladder one tier can reach.
+     *
+     * Wide enough that no tier is a coin flip - at 24 foils it is a pool of 11 - and narrow enough
+     * that the windows still mean something: a Common cannot reach Hyper Rare and an Ultra cannot
+     * come out matte.
+     */
+    private const FOIL_BAND = 0.45;
+
     public function __construct()
     {
         $this->cfg = config('pokehub');
@@ -546,7 +566,7 @@ class GithubCardService
 
         $axes = $gens ? ['generation' => $gens[crc32('gen:'.strtolower($login)) % count($gens)]] : [];
         if ($rarity !== '') {
-            $axes['glare'] = $this->glareFor($rarity);
+            $axes['glare'] = $this->foilFor($login, $rarity);
         }
 
         return $axes;
@@ -582,6 +602,93 @@ class GithubCardService
         }
 
         return $this->glareByPreset[$preset] ?? 'none';
+    }
+
+    /**
+     * The foil a card wears: still bounded by its rarity, but no longer decided by it.
+     *
+     * `glareFor` gives one preset exactly one foil, which means every card of a rarity is dressed
+     * identically - and rarity is the axis that piles up. Two cards in five share a tier, so two
+     * cards in five used to share a holo.
+     *
+     * So the foils are laid out as a LADDER, ordered by the tier of the presets that use them, and
+     * each tier reads a WINDOW of it rather than a single rung. The window is wide enough that no
+     * tier is a coin flip - at twenty-four foils it is a pool of eleven, so the commonest foil is
+     * one in eleven of its tier rather than the whole of it - and narrow enough that the tiers
+     * still mean something: a Common cannot reach Hyper Rare, and an Ultra cannot come out matte.
+     *
+     * The windows SLIDE rather than shrink at the ends, or Common and Ultra would be the two tiers
+     * with the fewest foils, which is backwards for Ultra and pointless for Common.
+     *
+     * 'none' is not on the ladder at all. It is the absence of a foil, and this exists so that no
+     * generated card is without one.
+     *
+     * Hashed off the login, on its own salt, so a card keeps its foil across reloads and does not
+     * move in lockstep with the generation the same login already picked.
+     */
+    public function foilFor(string $login, string $preset): string
+    {
+        $ladder = $this->foilLadder();
+        $count = count($ladder);
+        if ($count === 0) {
+            return $this->glareFor($preset);
+        }
+
+        $rank = self::TIER_RANK[$this->tierOfPreset($preset)] ?? 0;
+        $window = max(1, (int) round(self::FOIL_BAND * $count));
+        $centre = (int) round($rank / (count(self::TIER_RANK) - 1) * ($count - 1));
+        $start = max(0, min($centre - intdiv($window, 2), $count - $window));
+
+        return $ladder[$start + crc32('foil:'.mb_strtolower($login)) % $window];
+    }
+
+    /**
+     * Every enabled foil, weakest first.
+     *
+     * A foil's rung is the tier of the presets that print it, and the LOWEST of them when several
+     * do: reaching a foil should be as easy as the easiest card carrying it. Ties break on the
+     * slug so the order cannot shift under a card that already picked from it.
+     *
+     * @return list<string>
+     */
+    private function foilLadder(): array
+    {
+        if ($this->ladder !== null) {
+            return $this->ladder;
+        }
+
+        $rungOfDr = [];
+        foreach (CardAsset::where('category', 'rarity_preset')->get(['slug', 'meta']) as $p) {
+            $dr = (string) ($p->meta['dr'] ?? '');
+            $rung = self::TIER_RANK[$p->meta['tier'] ?? 'common'] ?? 0;
+            $rungOfDr[$dr] = isset($rungOfDr[$dr]) ? min($rungOfDr[$dr], $rung) : $rung;
+        }
+
+        $rows = [];
+        foreach (CardAsset::where('category', 'glare')->where('enabled', true)->get(['slug', 'meta']) as $g) {
+            $dr = (string) ($g->meta['dr'] ?? '');
+            if ($dr === '') {
+                continue; // 'none' is the absence of a foil, not a rung on the ladder.
+            }
+            $rows[] = ['slug' => $g->slug, 'rung' => $rungOfDr[$dr] ?? count(self::TIER_RANK) - 1];
+        }
+
+        usort($rows, fn (array $a, array $b) => [$a['rung'], $a['slug']] <=> [$b['rung'], $b['slug']]);
+
+        return $this->ladder = array_column($rows, 'slug');
+    }
+
+    /** The tier a rarity preset belongs to, from the admin-managed table. */
+    private function tierOfPreset(string $preset): string
+    {
+        if ($this->tierByPreset === null) {
+            $this->tierByPreset = CardAsset::where('category', 'rarity_preset')
+                ->get(['slug', 'meta'])
+                ->mapWithKeys(fn (CardAsset $p) => [$p->slug => (string) ($p->meta['tier'] ?? 'common')])
+                ->all();
+        }
+
+        return $this->tierByPreset[$preset] ?? 'common';
     }
 
     /**
