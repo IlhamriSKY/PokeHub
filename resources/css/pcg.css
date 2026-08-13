@@ -1169,13 +1169,13 @@
 .gen-1-gen .pcg-tag {
     top: 13.6%;
     right: 13.5%;
-    height: 7.77cqw; /* 5.2 +15%, then +30% */
+    height: 10.1cqw; /* 5.2 +15%, then +30% twice */
     z-index: 3;
 }
 /* Ultra Beast is the squarest tag (aspect 3.0), so at the shared height it reads
    smaller than the banner-shaped tags -- bump it on its own via the data-tag hook. */
 .gen-1-gen .pcg-tag[data-tag='ultra-beast'] {
-    height: 9.75cqw; /* 7.5 +30%, in step with the shared height above */
+    height: 12.68cqw; /* 7.5 +30% twice, in step with the shared height above */
 }
 /* Rarity pips sit bottom-RIGHT on 1st gen, not bottom-left: Base Set puts the rarity symbol
    after the collection number, and pokecardgenerator does the same (its star measures
@@ -1344,8 +1344,8 @@
 .gen-tcg-gen .pcg-tag {
     top: 10.07%;
     right: 2.87%;
-    width: 39.88cqw; /* 30.68 +30% */
-    height: 8.37%; /* 6.44 +30% */
+    width: 51.84cqw; /* 30.68 +30% twice */
+    height: 10.88%; /* 6.44 +30% twice */
     z-index: 3;
 }
 
@@ -1636,7 +1636,7 @@
 .gen-scarlet-violet .pcg-tag {
     top: 10.5%;
     right: 10%;
-    height: 5.46cqw; /* 4.2 +30% */
+    height: 7.1cqw; /* 4.2 +30% twice */
     z-index: 3;
 }
 /* SV shows ONE small rarity mark, not a pip row. Measured by swapping between rare /
