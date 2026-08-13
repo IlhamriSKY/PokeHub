@@ -275,6 +275,62 @@ class PublicGenerateTest extends TestCase
     }
 
     /**
+     * The tier thresholds, and the reason they moved.
+     *
+     * Common is the one tier whose only preset carries no foil, so where its ceiling sits decides
+     * how much of the site comes out matte. At 3.0 it swallowed 67% of real cards; at 1.5 it takes
+     * 27%. These four scores are the corners of that decision.
+     */
+    public function test_the_tier_thresholds_match_the_measured_calibration()
+    {
+        $svc = app(GithubCardService::class);
+
+        $this->assertSame('common', $svc->rarityTier(1.49));
+        $this->assertSame('uncommon', $svc->rarityTier(1.5));
+        $this->assertSame('rare', $svc->rarityTier(3.0));
+        $this->assertSame('ultra', $svc->rarityTier(5.5));
+
+        // The median real card scored 2.07, and it must not be in the foil-less tier any more.
+        $this->assertSame('uncommon', $svc->rarityTier(2.07));
+    }
+
+    /**
+     * Re-tiering overwrites a rarity, so it must never touch one a person chose.
+     *
+     * The tell is the axes blob: `axesFor` writes exactly generation and glare, while the card lab
+     * saves the whole panel. Any key beyond those two means somebody was here.
+     */
+    public function test_retiering_skips_a_card_that_was_styled_by_hand()
+    {
+        $this->seed(CardAssetSeeder::class);
+
+        $auto = Profile::create([
+            'login' => 'auto',
+            'github_json' => ['login' => 'auto', 'name' => 'Auto', 'followers' => 60, 'stars' => 40, 'repos' => 20],
+            // 'common' is what the old thresholds gave this score; nothing else has been set.
+            'card_json' => ['ai' => null, 'rarity' => 'common', 'axes' => ['generation' => '1-gen', 'glare' => 'none']],
+            'fetched_at' => 0,
+        ]);
+        $styled = Profile::create([
+            'login' => 'styled',
+            'github_json' => ['login' => 'styled', 'name' => 'Styled', 'followers' => 60, 'stars' => 40, 'repos' => 20],
+            'card_json' => ['ai' => null, 'rarity' => 'common', 'axes' => ['generation' => '1-gen', 'glare' => 'none', 'tag' => 'mega']],
+            'fetched_at' => 0,
+        ]);
+
+        $this->artisan('pokehub:card-axes --retier')->assertSuccessful();
+
+        // Scored 2.5-ish, so it leaves Common - and its foil follows the new rarity.
+        $moved = $auto->fresh()->card_json;
+        $this->assertNotSame('common', $moved['rarity']);
+        $this->assertNotSame('none', $moved['axes']['glare']);
+
+        // The hand-styled one keeps everything, rarity included.
+        $this->assertSame('common', $styled->fresh()->card_json['rarity']);
+        $this->assertSame('mega', $styled->fresh()->card_json['axes']['tag']);
+    }
+
+    /**
      * A generated card picks its own generation, and the three sets get used.
      *
      * The axes blob used to be empty, which meant DEFAULT_AXES - and that pins the generation to

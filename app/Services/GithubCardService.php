@@ -438,9 +438,10 @@ class GithubCardService
      * are heavy-tailed the way rarity is: an order of magnitude more followers is one step rarer,
      * not ten times rarer. Repo count and account age only nudge.
      *
-     *   ~5 followers, 3 stars, 20 repos, 3y   ->  1.7   (common)
-     *   100 / 200 / 40 / 6y                   ->  4.1   (uncommon)
-     *   2k / 5k / 60 / 8y                     ->  6.4   (rare)
+     *   0 followers, 0 stars, 1 repo, 1y      ->  0.1   (common)
+     *   ~5 followers, 3 stars, 20 repos, 3y   ->  1.7   (uncommon)
+     *   100 / 200 / 40 / 6y                   ->  4.1   (rare)
+     *   2k / 5k / 60 / 8y                     ->  6.4   (ultra)
      *   torvalds                              ->  9.6   (ultra)
      */
     public function rarityScore(array $p): float
@@ -454,15 +455,35 @@ class GithubCardService
     }
 
     /**
-     * Score to tier. The thresholds aim for a real set's pyramid, most developers Common and a
-     * handful Ultra, rather than an even split.
+     * Score to tier. A pyramid, not an even split - but calibrated against the people who actually
+     * use this, rather than against the developers it was first sketched from.
+     *
+     * The old 3.0 / 5.5 / 8.0 put 67% of the site in Common, and Common is the one tier holding a
+     * preset with no foil at all: the whole point of the product is a holographic card, and two
+     * cards in three came out matte. It was not mis-scoring anyone. It was measuring visitors
+     * against a bar set for famous accounts - reaching 3.0 takes roughly a hundred followers, while
+     * the median score across 102 real cards is 2.07.
+     *
+     * These three were picked by running the live scores through each candidate. Measured split:
+     *
+     *   3.0 / 5.5 / 8.0  ->  67% / 25% /  5% /  3%   (what it was)
+     *   2.0 / 4.0 / 6.5  ->  44% / 34% / 16% /  6%
+     *   1.5 / 3.0 / 5.5  ->  27% / 39% / 25% /  8%   (this)
+     *   1.0 / 2.5 / 5.0  ->  21% / 40% / 29% / 10%
+     *
+     * The last one was rejected: an Ultra that one card in ten reaches is not an Ultra. This set
+     * keeps Ultra at 8% while moving the bulk into Rare, which is also the deepest usable pool -
+     * ten presets against Uncommon's two - so it buys variety as well as foil.
+     *
+     * Only newly generated cards read this. Rarity is stored on the row, so existing cards keep
+     * whatever they were given; `pokehub:card-axes --retier` is what re-tiers those.
      */
     public function rarityTier(float $score): string
     {
         return match (true) {
-            $score >= 8.0 => 'ultra',
-            $score >= 5.5 => 'rare',
-            $score >= 3.0 => 'uncommon',
+            $score >= 5.5 => 'ultra',
+            $score >= 3.0 => 'rare',
+            $score >= 1.5 => 'uncommon',
             default => 'common',
         };
     }

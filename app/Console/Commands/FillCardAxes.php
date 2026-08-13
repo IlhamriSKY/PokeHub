@@ -26,13 +26,16 @@ use Illuminate\Console\Command;
  */
 class FillCardAxes extends Command
 {
-    protected $signature = 'pokehub:card-axes {--dry-run : Report what would change and write nothing}';
+    protected $signature = 'pokehub:card-axes
+                            {--dry-run : Report what would change and write nothing}
+                            {--retier : Also recompute the rarity of untouched generated cards}';
 
     protected $description = 'Give every stored card an explicit rarity, generation and foil';
 
     public function handle(GithubCardService $svc): int
     {
         $dry = (bool) $this->option('dry-run');
+        $retier = (bool) $this->option('retier');
         $touched = 0;
 
         // Generated cards. The rarity has to be derived from the profile itself when absent, which
@@ -47,6 +50,19 @@ class FillCardAxes extends Command
 
             $card = is_array($card) ? $card : [];
             $filled = $this->fill($card, $svc, $github['login'], $github);
+
+            if ($retier && $this->untouched($card)) {
+                $was = $card['rarity'] ?? '';
+                $now = $svc->rarityFor($github['login'], $github);
+                if ($now !== $was) {
+                    $card['rarity'] = $now;
+                    // The foil follows the rarity, so re-tiering without it would leave the card
+                    // wearing the old tier's holo - which is the very thing being repaired.
+                    $card['axes']['glare'] = $svc->glareFor($now);
+                    $filled[] = "rarity {$was} -> {$now}, glare={$card['axes']['glare']}";
+                }
+            }
+
             if (! $filled) {
                 continue;
             }
@@ -99,6 +115,24 @@ class FillCardAxes extends Command
             : "{$touched} cards filled in.");
 
         return self::SUCCESS;
+    }
+
+    /**
+     * Has anyone styled this card by hand?
+     *
+     * Re-tiering overwrites a rarity, so it must never touch one somebody chose. The tell is the
+     * axes blob: everything written automatically comes from `axesFor`, which sets exactly
+     * `generation` and `glare`. The card lab saves the whole panel - element, subtype, variant,
+     * tag, badge, icon, effect, frame, and the rest - so any key beyond those two means a person
+     * was here, and the rarity beside them is theirs rather than the scorer's.
+     *
+     * @param  array<string, mixed>  $card
+     */
+    private function untouched(array $card): bool
+    {
+        $axes = is_array($card['axes'] ?? null) ? $card['axes'] : [];
+
+        return ! array_diff(array_keys($axes), ['generation', 'glare']);
     }
 
     /**
