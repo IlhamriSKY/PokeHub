@@ -286,6 +286,9 @@ class CardLabTest extends TestCase
             'fetched_at' => 0,
         ]);
 
+        // The suite inherits a real AI key from .env, and this is about the fields a refresh keeps,
+        // not the lore it fetches.
+        config(['pokehub.ai.enabled' => false]);
         Http::fake([
             'api.github.com/users/octocat' => Http::response(['login' => 'octocat', 'name' => 'The Octocat', 'followers' => 9000]),
             'api.github.com/users/octocat/repos*' => Http::response([]),

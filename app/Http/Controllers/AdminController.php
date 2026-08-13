@@ -4,8 +4,10 @@ namespace App\Http\Controllers;
 
 use App\Models\CardAsset;
 use App\Models\Profile;
+use App\Models\ShowcaseCard;
 use App\Models\User;
 use App\Services\AvatarCache;
+use App\Services\CardCapture;
 use App\Services\CardSettingsService;
 use App\Support\CardPayload;
 use App\Support\GeneratedCards;
@@ -15,6 +17,7 @@ use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
@@ -308,6 +311,62 @@ class AdminController extends Controller
                     + $generatedTotal,
             ],
         ]);
+    }
+
+    /**
+     * Delete a card from the moderation table, whichever kind of row it is.
+     *
+     * `user:<id>` deletes the account, through deleteUser so the self-delete and last-admin guards
+     * are stated once. `profile:<login>` deletes a generated card, which has no account behind it.
+     *
+     * Deleting the row is only part of it. A generated card leaves three things behind that nothing
+     * else would ever collect, because every cleaner in this app is driven by a login it can still
+     * resolve: the rendered captures, the cached avatar - somebody's actual photograph on our disk -
+     * and the login's place in the home page's trainer pool, which is cached for an hour and would
+     * otherwise keep showing the face of a card that no longer exists.
+     */
+    public function deleteCard(string $key)
+    {
+        if (preg_match('/^user:(\d+)$/', $key, $m)) {
+            $user = User::find((int) $m[1]);
+
+            return $user ? $this->deleteUser($user) : back()->with('error', 'That account no longer exists.');
+        }
+
+        if (! preg_match('/^profile:([\w-]{1,39})$/', $key, $m)) {
+            return back()->with('error', 'That is not a card this page can delete.');
+        }
+
+        $login = mb_strtolower($m[1]);
+        $row = Profile::find($login);
+        if (! $row) {
+            return back()->with('error', 'That card no longer exists.');
+        }
+
+        /*
+         * A showcase card renders FROM this row, so deleting it would empty a slot on the home page
+         * with no sign of why. ShowcaseCard::cardPayload() returns null for a missing profile and
+         * the card is silently dropped, which is the kind of quiet breakage that gets found weeks
+         * later. Refused rather than cascaded: taking a card off the landing page is an editorial
+         * decision, and it already has its own switch.
+         */
+        if (ShowcaseCard::where('login', $login)->where('is_active', true)->exists()) {
+            return back()->with('error', "@{$login} is on the home page. Deactivate the showcase card first.");
+        }
+
+        app(CardCapture::class)->forget($login);
+        app(AvatarCache::class)->forget($login);
+        Cache::forget(LandingController::TRAINERS_KEY);
+
+        // Logged before the delete and without performedOn, like deleteUser: the subject is about
+        // to stop existing, so anything worth keeping has to be in the description.
+        activity('admin')->causedBy(Auth::user())
+            ->withProperties(['login' => $login])
+            ->log("Deleted the generated card for @{$login}");
+
+        $row->delete();
+
+        return back()->with('success', "Deleted the card for @{$login}.");
     }
 
     /** Take a public card down, or restore it. Moderation for an abusive public slug. */
