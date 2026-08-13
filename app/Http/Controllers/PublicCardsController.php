@@ -27,7 +27,16 @@ class PublicCardsController extends Controller
      * CardPayload trims each card on the way out instead of relying on the page size to bound the
      * response.
      */
-    public const PER_PAGE_OPTIONS = [10, 20, 40, 50];
+    public const PER_PAGE_OPTIONS = [10, 20, 40, 50, 100, self::PER_PAGE_ALL];
+
+    /**
+     * "Every card on one page", which is a size the paginator cannot be handed directly.
+     *
+     * A string rather than 0 or -1, because it travels in the URL and reads there: `?per=all`.
+     * Resolved to the row count once the list exists, so the pager still reports one honest page
+     * rather than a page of a size nothing counted.
+     */
+    public const PER_PAGE_ALL = 'all';
 
     private const PER_PAGE = 20;
 
@@ -36,9 +45,10 @@ class PublicCardsController extends Controller
         $q = trim((string) $request->query('q', ''));
         $rarity = trim((string) $request->query('rarity', ''));
         // Off the allowlist rather than clamped: a hand-typed ?per=37 answering with 37 cards makes
-        // the control disagree with the page it produced.
-        $per = (int) $request->query('per', self::PER_PAGE);
-        $per = in_array($per, self::PER_PAGE_OPTIONS, true) ? $per : self::PER_PAGE;
+        // the control disagree with the page it produced. Compared as strings so 'all' is matched
+        // by the same line as the numbers - casting first would turn it into 0.
+        $per = (string) $request->query('per', self::PER_PAGE);
+        $per = in_array($per, array_map('strval', self::PER_PAGE_OPTIONS), true) ? $per : (string) self::PER_PAGE;
 
         $claimed = User::query()
             ->select(['id', 'name', 'slug', 'github_login', 'card'])
@@ -86,11 +96,20 @@ class PublicCardsController extends Controller
             ->values()
             ->map(fn (array $r) => Arr::except($r, 'at'));
 
-        $page = LengthAwarePaginator::resolveCurrentPage();
+        /*
+         * "All" only becomes a number once the list exists, and it has to be at least 1: a
+         * paginator built with a page size of 0 divides by it to count the pages.
+         *
+         * The page is pinned to 1 as well. Asking for every card while ?page=3 is still in the
+         * address would otherwise page past the end of a one-page list and show nothing.
+         */
+        $all = $per === self::PER_PAGE_ALL;
+        $size = $all ? max(1, $rows->count()) : (int) $per;
+        $page = $all ? 1 : LengthAwarePaginator::resolveCurrentPage();
         $cards = new LengthAwarePaginator(
-            $rows->forPage($page, $per)->values(),
+            $rows->forPage($page, $size)->values(),
             $rows->count(),
-            $per,
+            $size,
             $page,
             ['path' => LengthAwarePaginator::resolveCurrentPath()]
         );

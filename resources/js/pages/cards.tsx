@@ -37,9 +37,13 @@ export default function Cards({
     cards: Paginated;
     q: string;
     rarity: string;
-    /** Page size, and the sizes offered. Both come from PublicCardsController, which validates on the same list. */
-    per: number;
-    perOptions: number[];
+    /**
+     * Page size, and the sizes offered. Both come from PublicCardsController, which validates on
+     * the same list. `'all'` rides here as a string because that is what it is in the URL, and
+     * the server is the only side that can turn it into a number - it needs the row count first.
+     */
+    per: number | string;
+    perOptions: (number | string)[];
     showcase?: ShowcaseEntry[];
 }) {
     /*
@@ -150,9 +154,11 @@ export default function Cards({
                             <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
+                            {/* "All" reads as itself rather than "all per page", which is not a
+                                page size anyone would say out loud. */}
                             {perOptions.map((n) => (
                                 <SelectItem key={n} value={String(n)}>
-                                    {n} per page
+                                    {typeof n === 'number' ? `${n} per page` : 'Show all'}
                                 </SelectItem>
                             ))}
                         </SelectContent>
