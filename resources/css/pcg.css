@@ -110,8 +110,18 @@
 }
 
 /* ---- shared content atoms (positions come from the per-gen blocks) ---- */
+/* Avatars are square and the photo windows are landscape - tcg's is 83.64% x 37.43% of the card,
+   an aspect of 1.60 - so `cover` throws away 18.8% off the top and the same off the bottom.
+   Centred, that lands on the head: on a full-length portrait the face sits in the upper third, and
+   cards were coming out cropped at the eyes.
+
+   30% rather than the 50% default lifts the kept band by a fifth of the overflow, which saves a
+   face without gutting a landscape avatar the way `top` would. It only bites where the crop is
+   vertical; a full-bleed variant covers a PORTRAIT window and trims the sides instead, where this
+   axis does nothing. */
 .pcg-photo {
     object-fit: cover;
+    object-position: 50% 30%;
 }
 .pcg-emblem {
     display: inline-block;
