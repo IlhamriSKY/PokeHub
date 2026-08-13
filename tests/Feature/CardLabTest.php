@@ -316,12 +316,47 @@ class CardLabTest extends TestCase
         $this->seed(CardAssetSeeder::class);
         $svc = app(GithubCardService::class);
 
+        // glareFor still answers "the one foil this rarity prints", which is what a card that
+        // wants its rarity's own holo asks for.
         foreach (['secret' => 'secret', 'pokeball' => 'pokeball', 'common' => 'none'] as $preset => $expected) {
             $this->assertSame($expected, $svc->glareFor($preset));
-            $this->assertSame($expected, $svc->axesFor('someone', $preset)['glare']);
         }
 
         // An unknown preset must degrade to a real slug, never to a broken axis.
         $this->assertSame('none', $svc->glareFor('no-such-preset'));
+
+        // What a generated card actually wears comes off the ladder instead, so it is a real foil
+        // rather than 'none' even at the bottom, and it is stable for a given login.
+        $glare = $svc->axesFor('someone', 'common')['glare'];
+        $this->assertNotSame('none', $glare);
+        $this->assertSame($glare, $svc->axesFor('SOMEONE', 'common')['glare']);
+    }
+
+    /**
+     * Same rarity, different foil - but never out of category.
+     *
+     * One preset used to mean one foil, and rarity is the axis that piles up: two cards in five
+     * share a tier, so two cards in five wore the same holo. Each tier now reads a window of the
+     * foil ladder rather than a single rung.
+     */
+    public function test_two_cards_of_one_rarity_can_wear_different_foils()
+    {
+        $this->seed(CardAssetSeeder::class);
+        $svc = app(GithubCardService::class);
+
+        $seen = [];
+        foreach (range(1, 40) as $i) {
+            $seen[$svc->foilFor("dev{$i}", 'common')] = true;
+        }
+        $this->assertGreaterThan(1, count($seen), 'every Common card came out in the same foil');
+
+        // ...and the window is still a window. A Common must not reach the top of the ladder.
+        $common = array_keys($seen);
+        foreach (['hyper', 'secret', 'specialillust'] as $outOfReach) {
+            $this->assertNotContains($outOfReach, $common, "a Common card reached {$outOfReach}");
+        }
+
+        // Nothing draws the absence of a foil, which is the point of the ladder excluding it.
+        $this->assertNotContains('none', $common);
     }
 }

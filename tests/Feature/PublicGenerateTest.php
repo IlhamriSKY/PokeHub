@@ -269,9 +269,11 @@ class PublicGenerateTest extends TestCase
         $this->assertNotEmpty($card['axes']['generation'] ?? '', 'no frame stored, so it defaults to 1-gen');
         $this->assertNotSame('auto', $card['axes']['glare'] ?? 'auto', 'the foil was left on auto');
 
-        // And the foil it picked is the one the rarity already prints, so storing it changed nothing.
+        // The foil comes off the ladder, so it is a real one rather than the absence of one, and
+        // it is drawn from the window its rarity can reach rather than pinned to that rarity.
         $svc = app(GithubCardService::class);
-        $this->assertSame($svc->glareFor($card['rarity']), $card['axes']['glare']);
+        $this->assertNotSame('none', $card['axes']['glare']);
+        $this->assertSame($svc->foilFor('octocat', $card['rarity']), $card['axes']['glare']);
     }
 
     /**

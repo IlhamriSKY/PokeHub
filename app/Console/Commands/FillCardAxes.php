@@ -58,7 +58,7 @@ class FillCardAxes extends Command
                     $card['rarity'] = $now;
                     // The foil follows the rarity, so re-tiering without it would leave the card
                     // wearing the old tier's holo - which is the very thing being repaired.
-                    $card['axes']['glare'] = $svc->glareFor($now);
+                    $card['axes']['glare'] = $svc->foilFor($github['login'], $now);
                     $filled[] = "rarity {$was} -> {$now}, glare={$card['axes']['glare']}";
                 }
             }
@@ -153,8 +153,8 @@ class FillCardAxes extends Command
         }
 
         $axes = is_array($card['axes'] ?? null) ? $card['axes'] : [];
-        // Derived together, because the generation is hashed off the login and the foil off the
-        // rarity - asking for one at a time would read the asset table twice per row.
+        // Derived together, because both are hashed off the login - asking for one at a time would
+        // read the asset table twice per row.
         $derived = $svc->axesFor($login, (string) $card['rarity']);
 
         foreach (['generation', 'glare'] as $axis) {
