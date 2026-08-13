@@ -29,7 +29,8 @@ class FillCardAxes extends Command
     protected $signature = 'pokehub:card-axes
                             {--dry-run : Report what would change and write nothing}
                             {--retier : Also recompute the rarity of untouched generated cards}
-                            {--refoil : Also re-draw the foil of untouched generated cards from the ladder}';
+                            {--refoil : Also re-draw the foil of untouched generated cards from the ladder}
+                            {--force : Let --refoil re-draw a hand-styled card too, foil only}';
 
     protected $description = 'Give every stored card an explicit rarity, generation and foil';
 
@@ -38,6 +39,7 @@ class FillCardAxes extends Command
         $dry = (bool) $this->option('dry-run');
         $retier = (bool) $this->option('retier');
         $refoil = (bool) $this->option('refoil');
+        $force = (bool) $this->option('force');
         $touched = 0;
 
         // Generated cards. The rarity has to be derived from the profile itself when absent, which
@@ -70,7 +72,7 @@ class FillCardAxes extends Command
              * written keep the one-foil-per-rarity assignment they were given - which is the very
              * uniformity the ladder exists to break.
              */
-            if ($refoil && $this->untouched($card) && ! empty($card['rarity'])) {
+            if ($refoil && ($force || $this->untouched($card)) && ! empty($card['rarity'])) {
                 $drawn = $svc->foilFor($github['login'], (string) $card['rarity']);
                 if ($drawn !== ($card['axes']['glare'] ?? null)) {
                     $filled[] = 'glare '.($card['axes']['glare'] ?? '-')." -> {$drawn}";
@@ -98,6 +100,17 @@ class FillCardAxes extends Command
             }
 
             $filled = $this->fill($card, $svc, (string) $login, is_array($card['profile'] ?? null) ? $card['profile'] : []);
+
+            // A claimed card is the one its owner actually looks at, so it wants a foil off the
+            // ladder every bit as much as an unclaimed one - and it was the half this reached last.
+            if ($refoil && ($force || $this->untouched($card)) && ! empty($card['rarity'])) {
+                $drawn = $svc->foilFor((string) $login, (string) $card['rarity']);
+                if ($drawn !== ($card['axes']['glare'] ?? null)) {
+                    $filled[] = 'glare '.($card['axes']['glare'] ?? '-')." -> {$drawn}";
+                    $card['axes']['glare'] = $drawn;
+                }
+            }
+
             if (! $filled) {
                 continue;
             }

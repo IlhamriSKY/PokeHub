@@ -398,5 +398,31 @@ class CardLabTest extends TestCase
 
         // Hand-styled: untouched, foil included.
         $this->assertSame('none', Profile::find('styled')->card_json['axes']['glare']);
+
+        // --force is how a matte hand-styled card is brought in, and it touches the foil ONLY.
+        $this->artisan('pokehub:card-axes --refoil --force')->assertSuccessful();
+        $forced = Profile::find('styled')->card_json;
+        $this->assertNotSame('none', $forced['axes']['glare'], '--force left the card matte');
+        $this->assertSame('mega', $forced['axes']['tag'], '--force overwrote styling it had no business touching');
+    }
+
+    /** A claimed card is the one its owner looks at, so the ladder has to reach it too. */
+    public function test_refoiling_reaches_a_claimed_account()
+    {
+        $this->seed(CardAssetSeeder::class);
+
+        $user = User::factory()->create([
+            'slug' => 'ash',
+            'github_login' => 'ash',
+            'card' => [
+                'profile' => ['login' => 'ash', 'name' => 'Ash'],
+                'rarity' => 'common',
+                'axes' => ['generation' => '1-gen', 'glare' => 'none'],
+            ],
+        ]);
+
+        $this->artisan('pokehub:card-axes --refoil')->assertSuccessful();
+
+        $this->assertNotSame('none', $user->fresh()->card['axes']['glare']);
     }
 }
