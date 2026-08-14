@@ -694,6 +694,42 @@ export default function Landing({
             {/* ---------- closing ---------- */}
             <section className="mx-auto max-w-6xl px-4 py-14">
                 <div className="bg-card relative isolate overflow-hidden rounded-2xl border px-6 py-14 text-center">
+                    {/* Background film.
+
+                        A 16:9 iframe has to COVER a panel whose height comes from its own text, and
+                        the usual vh/vw trick sizes against the viewport rather than the box - close
+                        on a full-width desktop panel, wrong on every other width. Container units
+                        solve it exactly: this wrapper is `inset-0`, so it has a definite size and
+                        can take `container-type: size`, and the frame then asks for whichever of
+                        100cqw / 100cqh does not leave a gap.
+
+                        Muted is not a preference, it is the price of autoplay - a browser will not
+                        start a video with sound unprompted, and one that starts talking under a
+                        sign-in button would deserve the mute anyway. `loop` needs `playlist` naming
+                        the same id or YouTube plays it once and stops on a black frame.
+
+                        `motion-reduce:hidden` drops the whole thing for anyone who has asked their
+                        system for less movement. The panel falls back to the flat `bg-card` it had
+                        before, which is why the tint below is a separate layer rather than baked
+                        into the frame. */}
+                    <div className="[container-type:size] pointer-events-none absolute inset-0 -z-10 overflow-hidden motion-reduce:hidden">
+                        <iframe
+                            className="absolute top-1/2 left-1/2 h-[max(100cqh,56.25cqw)] w-[max(100cqw,177.78cqh)] -translate-x-1/2 -translate-y-1/2 border-0"
+                            src="https://www.youtube-nocookie.com/embed/RQVeKSiVwJI?autoplay=1&mute=1&loop=1&playlist=RQVeKSiVwJI&controls=0&playsinline=1&rel=0&modestbranding=1&iv_load_policy=3&disablekb=1&fs=0"
+                            title="PokeHub"
+                            loading="lazy"
+                            referrerPolicy="strict-origin-when-cross-origin"
+                            allow="autoplay; encrypted-media"
+                            // Decoration, not content: nothing here to read, and a tab stop into a
+                            // frame with no controls is a dead end.
+                            aria-hidden="true"
+                            tabIndex={-1}
+                        />
+                    </div>
+                    {/* The film is behind a heading, a paragraph and two badges, so it has to lose
+                        most of its contrast to them. Its own layer rather than a filter on the
+                        frame, so the reduced-motion fallback above still leaves a solid panel. */}
+                    <div className="bg-card/80 pointer-events-none absolute inset-0 -z-10" />
                     {/* The page's one moving thing, moved here from the hero: behind a closing CTA
                         the capture wobble is the point, whereas behind the headline it was 34rem of
                         motion under text people were trying to read.
