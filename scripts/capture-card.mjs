@@ -60,10 +60,42 @@ if (!url || !out) {
 /** Shots live in memory; nothing touches disk until the finished file is written. */
 const shots = [];
 
+/*
+ * `--disable-gpu` is here to keep the box alive, not to go faster. There is no GPU on this server,
+ * so Chrome's gpu-process falls back to SwiftShader, and that fallback has a failure mode where it
+ * spins a core at 100% forever instead of exiting. Two of them once sat there for fifteen days and
+ * burned fourteen days of CPU time each. `--disable-software-rasterizer` shuts the same door from
+ * the other side, so no SwiftShader context is built even if the GPU path is probed first.
+ *
+ * The card needs neither: the foil is CSS blend modes and 3D transforms, which Skia rasterizes on
+ * the CPU, and there is no WebGL anywhere on the page.
+ */
 const browser = await puppeteer.launch({
     headless: 'new',
-    args: ['--no-sandbox', '--disable-dev-shm-usage', '--force-device-scale-factor=2'],
+    args: [
+        '--no-sandbox',
+        '--disable-dev-shm-usage',
+        '--force-device-scale-factor=2',
+        '--disable-gpu',
+        '--disable-software-rasterizer',
+    ],
 });
+
+/*
+ * CardCapture runs this under a Symfony Process with a 180s timeout, and that timeout signals THIS
+ * process, not the process group. Without these handlers node dies alone and Chrome is reparented
+ * to PID 1 with nobody left to close it, which is how the leak above piled up in the first place.
+ * `finally` does not cover it, because a signal is not an exception.
+ *
+ * SIGKILL on the browser rather than close(): close() negotiates over the DevTools pipe, and a
+ * wedged browser is precisely the case where that negotiation never gets an answer.
+ */
+for (const [sig, code] of [['SIGTERM', 143], ['SIGINT', 130], ['SIGHUP', 129]]) {
+    process.once(sig, () => {
+        browser.process()?.kill('SIGKILL');
+        process.exit(code);
+    });
+}
 
 try {
     const page = await browser.newPage();
@@ -188,7 +220,14 @@ try {
     writeFileSync(out, bytes);
     console.log(JSON.stringify({ format: IS_PNG ? 'png' : IS_SVG ? 'svg' : 'gif', frames: FRAMES, width: w, height: h, bytes: bytes.length }));
 } finally {
-    await browser.close();
+    /*
+     * Bounded, because close() can hang on a browser that has stopped answering, and that would
+     * turn one failed capture into a PHP worker stuck for the full 180s. If it has not returned in
+     * five seconds the browser is killed outright: by this point the file is either already written
+     * or already lost, so there is nothing left to wait for.
+     */
+    await Promise.race([browser.close(), new Promise((r) => setTimeout(r, 5000))]).catch(() => {});
+    browser.process()?.kill('SIGKILL');
 }
 
 /** The still as a bare PNG at output size: what svg() wraps, without the wrapper. */
